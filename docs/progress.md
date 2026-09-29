@@ -2,6 +2,7 @@
 
 ## Current state
 - Updated: 2026-09-29.
+- Branch: `main`; tested implementation milestone: `df12576`. Subsequent setup documentation/installed-skill commit is visible with `git log -1`.
 - Current milestone: retained stage 00 real local OTP proof; stage 01 foundation and stage 02 shared domain under implementation.
 - Owner's newest request: set up/deploy the specified Neon project. Completed: CLI login, project-scoped MCP, production link, exact config deployment and live HTTP 200 verification.
 - Last completed end-to-end capability: web email OTP sign-in through actual SMTP delivery and PostgreSQL, reload restoration and sign-out, tested at desktop and phone widths.
@@ -57,3 +58,5 @@
 - Domain revision transitions still need adversarial multi-device fixtures and transaction integration before stage 02/03 completion. Do not treat pure merge tests as end-to-end sync evidence.
 - Finish remaining stage 01/02 checks, then implement task migrations, authenticated transactional sync API and both durable local adapters. Preserve the working auth proof.
 - Neon deployment URL and exact verified setup are in `neon-setup.md`. `.neon`, root `.env.local` and `.codex/config.toml` are ignored; credentials are permission 0600.
+
+- Post-deploy `neon config plan` still proposes `~ function api` for the declared source; no claim of a no-op plan. Actual live handler output was verified successfully.

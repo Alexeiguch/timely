@@ -29,3 +29,5 @@ neon deploy
 ```
 
 `preview` is accepted by the installed config package, though current Neon docs prefer top-level `buckets`/`functions`. The supplied structure is retained exactly. This hello endpoint does not access private data. Managed Neon Auth is being provisioned only because the owner explicitly requested `auth: true`; the planner remains on self-hosted Better Auth unless the owner separately changes its architecture.
+
+A post-deployment plan reports `~ function api` for the declared source. Deployment success is evidenced by the completed apply and live HTTP response, not by claiming a no-op plan.
