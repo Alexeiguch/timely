@@ -47,7 +47,7 @@ CLI installation uses `/Users/alexei/.local/bin/neon` because `/usr/local/lib/no
 ## Google
 
 1. In the intended Google Cloud project, configure the OAuth consent screen and development test users.
-2. Create a web OAuth client. Register `https://BACKEND_HOST/api/auth/callback/google` (and the localhost callback for local web testing). Put its ID in `GOOGLE_WEB_CLIENT_ID` and its secret in server-only `GOOGLE_CLIENT_SECRET`.
+2. Create a web OAuth client. Register `https://BACKEND_HOST/api/auth/callback/google`. For local testing, add both `http://localhost:3000/api/auth/callback/google` (development server) and `http://localhost:3001/api/auth/callback/google` (built review server) as authorized redirect URIs. Keep any existing Neon callback; it does not replace these self-hosted Better Auth callbacks. Put its ID in `GOOGLE_WEB_CLIENT_ID` and its secret in server-only `GOOGLE_CLIENT_SECRET`.
 3. Create an iOS client matching the actual bundle identifier. Set `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` and `GOOGLE_IOS_URL_SCHEME` to its reversed client ID.
 4. Create an Android client matching the actual package identifier and development signing SHA-1; register release signing separately.
 5. Set `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` to the web client ID so native Google returns an ID token for the server's configured audience. Do not put the client secret in mobile env.

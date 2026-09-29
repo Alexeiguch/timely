@@ -13,7 +13,7 @@
 ## Stage tracker
 | Stage | Status | Evidence / remaining work |
 | --- | --- | --- |
-| 00 Authentication | blocked_external | Real SMTP OTP, restoration and revocation pass. Google/Apple/Resend credentials, HTTPS callback and physical iOS/Android provider evidence remain missing. |
+| 00 Authentication | blocked_external | Real SMTP OTP, restoration and revocation pass. Google web credentials installed; initiation passes but Google rejects the unregistered local callback. Apple/Resend credentials, Google native IDs, HTTPS callback and physical iOS/Android provider evidence remain missing. |
 | 01 Foundation | in_progress | Workspace, strict TS, fonts/tokens, auth and planner shells, responsive web navigation, web/native bundles. Native visual/runtime proof and full accessibility matrix remain. |
 | 02 Shared domain | in_progress | Recurrence/time/scopes/history/reminders/ordering and canonical journal reducer tested. Added reversed structural edits plus offline completion, future-range tombstones and fast distant daily expansion. Further overlapping-scope/property/scale/Hermes fixtures remain. |
 | 03 Database/API | in_progress | Migration 0001, real owner-scoped register/push/pull/bootstrap, atomic audit/feed/jobs, exact dedupe and consistent snapshots pass on Neon. Preferences, materialization/history pagination, reminder coverage/registration, account deletion, shared production rate limiter and retention/checkpointing remain. |
@@ -39,7 +39,7 @@
 ## External dependencies
 | Missing item | Gate | Owner action when available |
 | --- | --- | --- |
-| Google web/iOS/Android OAuth IDs and server secret | Provider proof | Supply/configure a local environment-file path and provider callbacks. |
+| Google callback registration and iOS/Android OAuth IDs | Provider proof | Web credentials installed locally. Add localhost callbacks for ports 3000/3001, then verify real consent/session; supply native client IDs for device proof. |
 | Apple Service/App IDs, generated client secret, HTTPS callback domain | Apple native/web proof | Configure developer account and callback. |
 | Verified Resend sender and API key | Hosted real mail | Configure sender; local Mailpit works. |
 | Signed development builds/physical devices | Native auth/SQLite/reminders | Run stated iOS/Android matrix after environment/app identifiers are ready. |
@@ -67,3 +67,9 @@ Never put secrets, OTPs or sessions into these documents. Neon authentication/se
 - Added a public, uncached availability endpoint returning only `google`/`apple` booleans from the running auth instance. Web sign-in keeps unavailable providers disabled, explains email fallback, and provides retry when availability cannot be fetched. No dummy providers or fake sign-in were added.
 - Verification: production build, web TypeScript, boundary lint and six targeted desktop/phone browser checks pass (icons online/offline, availability flags, network-failure retry, real email OTP/restoration/sign-out). Refreshed signed-out visual evidence.
 - Social OAuth remains `blocked_external`: owner was asked for the local environment-file path containing credentials, without exposing secrets. Provider login itself is not claimed verified.
+
+## Follow-up — Google web credentials
+- Imported the owner-provided Google web client into ignored `apps/web/.env.local`; preserved other settings and restarted the built app on port 3001. Both the downloaded JSON and environment file have mode 0600. Added `client_secret_*.json` to `.gitignore`.
+- Live availability is now `google: true, apple: false`. Social sign-in initiation returns HTTP 200 with a Google authorization URL, state and PKCE, using `http://localhost:3001/api/auth/callback/google`.
+- Google currently rejects that URL with `redirect_uri_mismatch`. The downloaded client lists only a Neon callback. Add the self-hosted callbacks for localhost ports 3000 and 3001 in Google Cloud Console, retaining the Neon URI. The accessible console browser requires owner sign-in; the owner was asked to register the callbacks or sign in there.
+- Six targeted desktop/phone browser checks pass with Google enabled, including actual email OTP/restoration/sign-out. Screenshots refreshed. Complete Google consent/session and native authentication remain unverified; no Google login success is claimed.

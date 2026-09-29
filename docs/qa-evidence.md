@@ -36,3 +36,7 @@ Current screenshots demonstrate an implementation baseline, not complete stage 0
 ## Favicon/social-provider regression checks — 2026-09-29
 
 `TEST_BASE_URL=http://localhost:3001 pnpm exec playwright test tests/web/auth-availability.spec.ts tests/web/auth.spec.ts`: 6/6 passed. Favicon ICO and SVG return HTTP 200, metadata advertises both, and the service worker serves them offline including cache-busting queries. Public provider availability contains only two booleans with `no-store`. Missing or unreachable provider configuration disables social buttons without blocking email; retry restores availability. Existing actual SMTP OTP sign-in/reload/sign-out remains passing. This is not Google/Apple OAuth verification; credentials are still missing.
+
+## Google credentials follow-up — 2026-09-29
+
+Google web credentials are now configured in the ignored server environment. Live provider availability reports Google enabled and Apple disabled. A real Google social initiation returns HTTP 200 with state, PKCE and the expected localhost:3001 callback, resolving the previous `PROVIDER_NOT_FOUND` response. Google's authorization endpoint reports `redirect_uri_mismatch`, so full consent/session verification remains blocked on registering the local callbacks. No provider tokens, credentials or authorization URLs were logged. The same six targeted browser checks pass (6.7 seconds), with Google enabled and real SMTP email authentication preserved. Signed-out screenshots were refreshed.

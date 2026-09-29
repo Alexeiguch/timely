@@ -15,3 +15,6 @@ playwright-report/
 .neon
 
 .codex/config.toml
+
+# Downloaded OAuth client credentials
+client_secret_*.json
