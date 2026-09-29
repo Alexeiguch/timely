@@ -1,0 +1,41 @@
+{
+  "name": "timely",
+  "private": true,
+  "packageManager": "pnpm@10.7.0",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @timely/web dev",
+    "dev:mobile": "pnpm --filter @timely/mobile start",
+    "build": "pnpm --filter @timely/web build",
+    "typecheck": "turbo typecheck",
+    "test": "vitest run",
+    "lint": "node scripts/check-boundaries.mjs",
+    "db:generate": "pnpm --filter @timely/db generate",
+    "db:migrate": "pnpm --filter @timely/db migrate",
+    "test:e2e": "playwright test",
+    "test:auth": "node scripts/auth-smoke.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "auth": "1.7.6",
+    "tsx": "4.21.0",
+    "turbo": "2.11.5",
+    "typescript": "5.9.3",
+    "vitest": "4.0.18"
+  },
+  "dependencies": {
+    "@neon/config": "1.8.3",
+    "@neon/env": "1.4.8"
+  },
+  "type": "module",
+  "pnpm": {
+    "overrides": {
+      "@better-auth/utils": "0.4.2"
+    }
+  }
+}

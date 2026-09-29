@@ -1,0 +1,24 @@
+{
+  "name": "@timely/db",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "generate": "drizzle-kit generate",
+    "migrate": "tsx src/migrate.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.3",
+    "postgres": "3.4.9",
+    "@timely/contracts": "workspace:*",
+    "@timely/domain": "workspace:*",
+    "@timely/sync": "workspace:*"
+  },
+  "devDependencies": {
+    "drizzle-kit": "0.31.11"
+  }
+}

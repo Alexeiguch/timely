@@ -1,0 +1,25 @@
+{
+  "name": "@timely/auth",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "exports": {
+    "./server": "./src/server.ts",
+    "./client": "./src/client.ts"
+  },
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "1.7.6",
+    "@better-auth/expo": "1.7.6",
+    "@better-auth/utils": "0.4.2",
+    "@timely/db": "workspace:*",
+    "better-auth": "1.7.6",
+    "nodemailer": "7.0.13",
+    "resend": "6.31.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "7.0.11"
+  }
+}

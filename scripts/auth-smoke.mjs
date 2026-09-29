@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+const base = process.env.TEST_BASE_URL ?? 'http://localhost:3000';
+const mail = process.env.TEST_MAIL_URL ?? 'http://127.0.0.1:8025';
+if (!['localhost','127.0.0.1'].includes(new URL(base).hostname) || !['localhost','127.0.0.1'].includes(new URL(mail).hostname)) throw new Error('This synthetic smoke test only runs against local test services');
+async function post(path, body, cookie) {
+  return fetch(base+path,{method:'POST',headers:{'Content-Type':'application/json',Origin:base,...(cookie?{Cookie:cookie}:{})},body:JSON.stringify(body)});
+}
+const anonymous = await fetch(base+'/api/v1/me'); assert.equal(anonymous.status,401);
+console.log('PASS anonymous account endpoint rejected');
+const email = `auth-proof-${randomUUID()}@example.test`;
+const sent = await post('/api/auth/email-otp/send-verification-otp',{email,type:'sign-in'});
+assert.equal(sent.status,200,'OTP request must succeed');
+const messages = await (await fetch(mail+'/api/v1/messages')).json();
+const message = messages.messages.find(m=>m.To.some(r=>r.Address===email)); assert.ok(message,'Mailpit captured actual SMTP delivery');
+const content = await (await fetch(mail+'/api/v1/message/'+message.ID)).json();
+const otp = content.Text.match(/code is (\d{6})/)?.[1]; assert.ok(otp,'Delivered message contains an OTP');
+const wrong = otp === '000000' ? '111111' : '000000';
+const rejected = await post('/api/auth/sign-in/email-otp',{email,otp:wrong});assert.equal(rejected.status,400);
+console.log('PASS invalid email OTP rejected');
+const signed = await post('/api/auth/sign-in/email-otp',{email,otp});assert.equal(signed.status,200,'Valid delivered code signs in');
+const cookie = signed.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');assert.ok(cookie);
+const user = (await signed.json()).user;assert.ok(user.id);
+const restored = await fetch(base+'/api/v1/me',{headers:{Cookie:cookie}});assert.equal(restored.status,200);assert.equal((await restored.json()).user.id,user.id);
+console.log('PASS SMTP OTP sign-in and cookie session restoration');
+const reused=await post('/api/auth/sign-in/email-otp',{email,otp});assert.notEqual(reused.status,200);
+console.log('PASS consumed OTP cannot be reused');
+const signedOut=await post('/api/auth/sign-out',{},cookie);assert.equal(signedOut.status,200);
+const revoked=await fetch(base+'/api/v1/me',{headers:{Cookie:cookie}});assert.equal(revoked.status,401);
+console.log('PASS sign-out revokes protected access');

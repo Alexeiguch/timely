@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: timely
+      POSTGRES_PASSWORD: timely
+      POSTGRES_DB: timely
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["timely-postgres:/var/lib/postgresql/data"]
+  mailpit:
+    image: axllent/mailpit:v1.29
+    ports: ["127.0.0.1:1025:1025", "127.0.0.1:8025:8025"]
+volumes:
+  timely-postgres:

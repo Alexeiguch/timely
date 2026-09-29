@@ -1,0 +1,85 @@
+# Timely development setup
+
+## Current implementation
+
+The repository currently contains the retained stage 00 authentication proof, workspace foundation, and shared recurrence/time/conflict-ordering modules. It is not yet a complete planner. See [progress](progress.md) for exact implementation and verification gates.
+
+Prerequisites: Node 22.13+ (tested on 24.19.0), pnpm 10.7.0, Docker Desktop for local PostgreSQL/Mailpit, Xcode for iOS and Android Studio for Android. Native social sign-in requires a development build, not Expo Go.
+
+```sh
+pnpm install --frozen-lockfile
+docker compose up -d
+cp apps/web/.env.example apps/web/.env.local
+# Replace BETTER_AUTH_SECRET with a random secret; never commit .env.local.
+DATABASE_URL=postgres://timely:timely@127.0.0.1:5432/timely pnpm db:migrate
+pnpm dev
+```
+
+The local mail inbox is http://localhost:8025 and the web proof is http://localhost:3000. Enter a synthetic `@example.test` email, retrieve its code from Mailpit, and sign in. Local email never leaves Mailpit. Production refuses the capture transport.
+
+```sh
+node scripts/auth-smoke.mjs
+pnpm typecheck
+pnpm test
+pnpm lint
+pnpm build
+```
+
+`auth-smoke.mjs` uses local-only services and synthetic accounts. It checks actual SMTP delivery, invalid/consumed code rejection, cookie restoration, protected access and revocation. It never prints tokens or codes. Generated auth tables live in the app-managed `timely_auth` PostgreSQL schema; they do not modify `neon_auth`.
+
+To regenerate auth schema after an intentional auth/plugin change:
+
+```sh
+pnpm exec auth generate --config packages/auth/generate.config.ts --output packages/db/src/auth-schema.ts --yes
+pnpm db:generate
+```
+
+Review generated migrations before applying. The generator has an isolated non-runtime schema-only configuration; production auth still requires real environment configuration.
+
+## Neon
+
+Use a disposable development branch for planner migrations. Set `DATABASE_URL` to its pooled URL and `DATABASE_MIGRATION_URL` to its direct URL. Neither is public. Do not run development seeds against production.
+
+The owner separately requested a Neon deployment to project `fragrant-bonus-17540843`, branch `production`, using the root `neon.ts` and `hello.ts`. This provisions managed Neon Auth, a private uploads bucket, and a hello-world Function. It does not switch the planner away from self-hosted Better Auth. Current deployment state is in [progress](progress.md).
+
+CLI installation uses `/Users/alexei/.local/bin/neon` because `/usr/local/lib/node_modules` was not writable. Add `$HOME/.local/bin` to PATH in your shell if needed. No shell profile has been modified automatically.
+
+## Google
+
+1. In the intended Google Cloud project, configure the OAuth consent screen and development test users.
+2. Create a web OAuth client. Register `https://BACKEND_HOST/api/auth/callback/google` (and the localhost callback for local web testing). Put its ID in `GOOGLE_WEB_CLIENT_ID` and its secret in server-only `GOOGLE_CLIENT_SECRET`.
+3. Create an iOS client matching the actual bundle identifier. Set `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` and `GOOGLE_IOS_URL_SCHEME` to its reversed client ID.
+4. Create an Android client matching the actual package identifier and development signing SHA-1; register release signing separately.
+5. Set `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` to the web client ID so native Google returns an ID token for the server's configured audience. Do not put the client secret in mobile env.
+6. Build and test both native clients, including cancellation and denied consent.
+
+## Apple
+
+1. Use an active Apple Developer team. Register the actual App ID with Sign in with Apple. `com.example.timely.*` values are documented placeholders, not registered IDs.
+2. Create a distinct Service ID for web/Android, associate the native App ID, and register a real HTTPS callback domain and `https://BACKEND_HOST/api/auth/callback/apple`. Apple browser sign-in cannot use localhost.
+3. Generate the Sign in with Apple key. Keep its `.p8` private key, team ID and key ID server-side or in a secure signing workflow.
+4. Generate an ES256 client-secret JWT with issuer=team ID, subject=Service ID, audience=`https://appleid.apple.com`, key ID in header, and expiration less than Apple's maximum six-month interval. Store only the resulting JWT in `APPLE_CLIENT_SECRET`; renew before expiry. Use the official [Better Auth Apple guide](https://better-auth.com/docs/authentication/apple).
+5. Set `APPLE_SERVICE_ID` and `APPLE_BUNDLE_ID`. The server validates both allowed audiences through Better Auth; native iOS sends a random nonce and the verified identity token. No token verification bypass or platform-header audience selection is used.
+6. Verify first and repeat authorization, cancellation, private relay, and missing subsequent profile details on a real iOS build. Android uses Apple browser OAuth with app return.
+
+## Email delivery
+
+Verify a sender domain in Resend; set server-only `RESEND_API_KEY` and `MAIL_FROM`. Remove capture mode outside local development. Codes expire after five minutes, have five attempts, are stored hashed, and are rate limited server-side. UI resend cooldown is 60 seconds. Do not log OTPs or captured messages.
+
+## Native builds and session proof
+
+Copy `apps/mobile/.env.example` to `.env.local`, set the reachable backend URL and public Google IDs. A physical device cannot reach your computer using `localhost`; use a trusted HTTPS development backend. Set `APP_IDENTIFIER`, `APP_VARIANT`, and `GOOGLE_IOS_URL_SCHEME` before building.
+
+```sh
+pnpm --filter @timely/mobile ios
+pnpm --filter @timely/mobile android
+pnpm dev:mobile
+```
+
+EAS profiles in `apps/mobile/eas.json` separate development, preview and production app IDs/schemes. Register actual IDs/callbacks before EAS builds. Configure signing through your Apple/Google accounts. No store submission or paid build purchase has been performed.
+
+Native sessions use Better Auth Expo secure storage. Protected API requests await `getCookie()` and send it with `credentials: 'omit'`. Verify restart restoration and sign-out using the protected account proof button. Native full planner/offline storage is not yet implemented.
+
+## Rotation
+
+Rotate database role credentials and update both request and migration URLs. Rotate Resend/Google secrets in the provider console then the backend secret store. Renew Apple client-secret JWT before expiry; revoke and replace a compromised key. Rotating `BETTER_AUTH_SECRET` can invalidate sessions; plan reauthentication. Never copy secrets to public Expo/Next.js env fields or source-controlled docs.
