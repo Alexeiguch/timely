@@ -83,3 +83,28 @@ Native sessions use Better Auth Expo secure storage. Protected API requests awai
 ## Rotation
 
 Rotate database role credentials and update both request and migration URLs. Rotate Resend/Google secrets in the provider console then the backend secret store. Renew Apple client-secret JWT before expiry; revoke and replace a compromised key. Rotating `BETTER_AUTH_SECRET` can invalidate sessions; plan reauthentication. Never copy secrets to public Expo/Next.js env fields or source-controlled docs.
+
+## Planner persistence and offline browser verification
+
+The additional migration is `packages/db/migrations/0001_majestic_invaders.sql`. It creates the app-managed `timely` schema. Do not apply it to the root production connection as part of ordinary development.
+
+The isolated Neon development credentials are in the ignored `.env.neon-development`. Run migrations from the repository root without printing its contents:
+
+```sh
+node --env-file=.env.neon-development --import tsx -e 'process.chdir("packages/db"); await import("./packages/db/src/migrate.ts")'
+RUN_DB_TESTS=1 node --env-file=.env.neon-development node_modules/vitest/vitest.mjs run packages/db/src/planner.integration.test.ts
+```
+
+The integration suite creates synthetic owners and removes them after testing. It verifies real transactions, deduplication, two-account boundaries and snapshot/feed consistency. Its 60-second per-test budget accounts for development-branch network latency; the first default five-second run timed out, and cleanup overlapped unfinished transactions. The corrected run passes.
+
+The browser's service worker is enabled in a production build. For a **local** production-artifact test with existing local Postgres and Mailpit configuration:
+
+```sh
+pnpm build
+APP_ENV=local BETTER_AUTH_URL=http://localhost:3001 pnpm --filter @timely/web start --port 3001
+TEST_BASE_URL=http://localhost:3001 pnpm test:e2e
+```
+
+`APP_ENV=local` allows capture mail in a built app only when both the backend URL and database URL are loopback hosts. It still sends real SMTP and uses real Better Auth sessions. Hosted production requires Resend configuration. Browser fixtures represent separate synthetic client IPs for the authentication rate limiter and poll for actual mail delivery; no OTP or session token is written to evidence.
+
+Web navigation is Planner / Review / Search / Settings. The current Review and Search cover the selected downloaded period. Overdue display covers the preceding year and labels that coverage. Broader history, synchronized preferences, recovery/discard controls, drag/reorder and release notification delivery remain under implementation. The native planner can create tasks and complete/skip/move/delete synchronized occurrences; custom recurrence editing is currently on web.

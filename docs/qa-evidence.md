@@ -24,3 +24,11 @@ This is an authentication/foundation/domain milestone, not full planner acceptan
 Visual evidence: [desktop](evidence/auth-desktop.png), [320px phone](evidence/auth-phone.png). Screenshots were captured before any authentication material was entered. Browser traces/videos were disabled. Live inspection also checked the same signed-out web screen in the Codex browser.
 
 Fonts are bundled; license files are in `licenses/`. Native font module imports use individual weights. Exact palette is centralized in `packages/design`; full contrast/accessibility and full planner screen QA remain pending.
+
+## Durable planner milestone — 2026-09-29
+
+The browser suite now contains eight passing tests across desktop (1280×800) and phone (320×740). These use real delivered SMTP codes, Better Auth cookies, local PostgreSQL, IndexedDB, the production public-shell service worker and two independently signed-in browser contexts. An offline task and completion survive reload and synchronize to the second client. Recurrence future edits, move/skip/unskip/delete, stable IDs and API account/origin boundaries are exercised. Synthetic screenshots are in `docs/evidence/planner-{day,month,editor}-{desktop,phone}.png`. No credential/OTP/session material is captured.
+
+Four real Neon integration tests pass on `timely-development`, including lost-response replay and overlapping commits during a paginated fixed-watermark bootstrap. Unit suite: 46 passing. All nine TypeScript packages, the client/server boundary guard and production web build pass. Both native Hermes bundles compile. SQLite physical-device restart, native auth, notification scheduling, the broader accessibility matrix and production release gates remain unverified.
+
+Current screenshots demonstrate an implementation baseline, not complete stage 05/06 acceptance. Full native editor/navigation parity, drag/reorder, synchronized preferences, expanded historical coverage, explicit failed-operation recovery and reminders are still under implementation. See the stage table in `progress.md`.
