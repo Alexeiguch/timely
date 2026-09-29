@@ -32,3 +32,7 @@ The browser suite now contains eight passing tests across desktop (1280×800) an
 Four real Neon integration tests pass on `timely-development`, including lost-response replay and overlapping commits during a paginated fixed-watermark bootstrap. Unit suite: 46 passing. All nine TypeScript packages, the client/server boundary guard and production web build pass. Both native Hermes bundles compile. SQLite physical-device restart, native auth, notification scheduling, the broader accessibility matrix and production release gates remain unverified.
 
 Current screenshots demonstrate an implementation baseline, not complete stage 05/06 acceptance. Full native editor/navigation parity, drag/reorder, synchronized preferences, expanded historical coverage, explicit failed-operation recovery and reminders are still under implementation. See the stage table in `progress.md`.
+
+## Favicon/social-provider regression checks — 2026-09-29
+
+`TEST_BASE_URL=http://localhost:3001 pnpm exec playwright test tests/web/auth-availability.spec.ts tests/web/auth.spec.ts`: 6/6 passed. Favicon ICO and SVG return HTTP 200, metadata advertises both, and the service worker serves them offline including cache-busting queries. Public provider availability contains only two booleans with `no-store`. Missing or unreachable provider configuration disables social buttons without blocking email; retry restores availability. Existing actual SMTP OTP sign-in/reload/sign-out remains passing. This is not Google/Apple OAuth verification; credentials are still missing.

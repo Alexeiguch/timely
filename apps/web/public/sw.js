@@ -1,9 +1,10 @@
-// Only this public, client-rendered shell and immutable build assets enter the cache.
+// Only the public client shell, app icons and immutable build assets enter the cache.
 // Auth/API responses, RSC requests, task content and other navigation URLs never do.
 const CACHE = "timely-public-shell-v2";
+const icon = (url) => ["/favicon.ico", "/icon.svg"].includes(url.pathname);
 const asset = (url) =>
   url.origin === self.location.origin &&
-  url.pathname.startsWith("/_next/static/");
+  (url.pathname.startsWith("/_next/static/") || icon(url));
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE).then(async (cache) => {
@@ -17,6 +18,15 @@ self.addEventListener("install", (event) => {
       )
         throw new Error("Public shell unavailable");
       await cache.put("/", response);
+      await Promise.all(
+        ["/favicon.ico", "/icon.svg"].map(async (path) => {
+          const response = await fetch(path, {
+            credentials: "omit",
+            cache: "reload",
+          });
+          if (response.ok) await cache.put(path, response);
+        }),
+      );
       await self.skipWaiting();
     }),
   );
@@ -72,7 +82,7 @@ self.addEventListener("fetch", (event) => {
   if (asset(url)) {
     event.respondWith(
       caches.open(CACHE).then(async (cache) => {
-        const cached = await cache.match(request);
+        const cached = await cache.match(request, { ignoreSearch: icon(url) });
         if (cached) return cached;
         const response = await fetch(request);
         if (response.ok) await cache.put(request, response.clone());

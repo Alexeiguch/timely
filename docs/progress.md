@@ -60,3 +60,10 @@ Never put secrets, OTPs or sessions into these documents. Neon authentication/se
 - Local built app for review: `http://localhost:3001`, started with `APP_ENV=local BETTER_AUTH_URL=http://localhost:3001`. Docker Postgres/Mailpit are running. Normal `pnpm dev` remains available on port 3000.
 - `apps/web/.env.local` is the existing local Docker/Mailpit environment. `.env.neon-development` is a new ignored 0600 file used for isolated Neon migrations/integration tests. Root `.env.local` and `.neon` still target the owner's deployed production hello project; do not use them for planner development migrations.
 - See `setup.md`, `qa-evidence.md`, and `decisions/003-sync-persistence.md` for executable checks and remaining gates.
+
+## Follow-up — favicon and social sign-in availability
+- Added branded `app/favicon.ico` (16/32/48 px) and `app/icon.svg` using Next.js metadata conventions. Both return HTTP 200 and are cached as public icons for offline use.
+- Reproduced the social POST error as Better Auth `404 PROVIDER_NOT_FOUND`, not a missing Next.js route. The running local environment has neither Google nor Apple credential pairs configured.
+- Added a public, uncached availability endpoint returning only `google`/`apple` booleans from the running auth instance. Web sign-in keeps unavailable providers disabled, explains email fallback, and provides retry when availability cannot be fetched. No dummy providers or fake sign-in were added.
+- Verification: production build, web TypeScript, boundary lint and six targeted desktop/phone browser checks pass (icons online/offline, availability flags, network-failure retry, real email OTP/restoration/sign-out). Refreshed signed-out visual evidence.
+- Social OAuth remains `blocked_external`: owner was asked for the local environment-file path containing credentials, without exposing secrets. Provider login itself is not claimed verified.

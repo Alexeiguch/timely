@@ -958,3 +958,4 @@ a {
   .editor .form-grid { grid-template-columns: 1fr; }
   .editor h2 { font-size: 24px; }
 }
+.provider-availability { font-size: 14px; color: var(--muted); }
