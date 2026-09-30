@@ -173,6 +173,18 @@ small {
   display: grid;
   gap: 16px;
 }
+.social-signin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding-inline: 12px;
+}
+.social-signin svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
 .divider {
   display: flex;
   align-items: center;
@@ -228,6 +240,7 @@ a {
   top: 0;
   height: 100dvh;
   padding: 40px 24px 24px;
+  background: #f0efe5;
   border-right: 1px solid #e2e6de;
   display: flex;
   flex-direction: column;

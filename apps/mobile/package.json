@@ -13,6 +13,7 @@
     "@better-auth/utils": "0.4.2",
     "@expo-google-fonts/baloo-2": "0.4.2",
     "@expo-google-fonts/nunito-sans": "0.4.2",
+    "@react-native-community/datetimepicker": "8.6.0",
     "@react-native-google-signin/google-signin": "16.1.5",
     "@timely/contracts": "workspace:*",
     "@timely/design": "workspace:*",

@@ -1,6 +1,6 @@
 # QA evidence — 2026-09-29
 
-This is an authentication/foundation/domain milestone, not full planner acceptance.
+This document retains chronological milestone evidence, not full planner acceptance. See [implementation-audit.md](implementation-audit.md) for the current 30 September status; earlier pending statements describe the date of their section.
 
 | Check | Result | Environment / evidence |
 | --- | --- | --- |
@@ -40,3 +40,26 @@ Current screenshots demonstrate an implementation baseline, not complete stage 0
 ## Google credentials follow-up — 2026-09-29
 
 Google web credentials are now configured in the ignored server environment. Live provider availability reports Google enabled and Apple disabled. A real Google social initiation returns HTTP 200 with state, PKCE and the expected localhost:3001 callback, resolving the previous `PROVIDER_NOT_FOUND` response. Google's authorization endpoint reports `redirect_uri_mismatch`, so full consent/session verification remains blocked on registering the local callbacks. No provider tokens, credentials or authorization URLs were logged. The same six targeted browser checks pass (6.7 seconds), with Google enabled and real SMTP email authentication preserved. Signed-out screenshots were refreshed.
+
+## Mobile code milestone / audit — 2026-09-30
+
+- Last executed unit suite: 58 passing tests. Real Neon development integration suite: 5/5 passing, including targeted future-delete Undo and idempotent replay.
+- Last browser suite: 12/12 passing before the final shared calendar/editor helper refactor. The subsequent production web build passed, including TypeScript; browser regression verification of that last refactor remains pending.
+- iOS/Android Hermes export passed to `/tmp/timely-stage06-export-final`. Local iOS simulator Release build and subsequent ad-hoc-signed build succeeded. No physical-device or Android native runtime pass is claimed.
+- The first unsigned simulator app rendered the sign-in screen, then failed SecureStore access with a Keychain entitlement error. Retesting the signed build is still pending; native OTP, authenticated planner flows, SQLite restart and web/mobile convergence remain unverified.
+- `tests/mobile/planner.yaml` is a prepared, unexecuted Maestro flow. It is not automated native evidence yet.
+- Four tabs, full native recurrence editor, scoped actions/Undo, explicit reorder, links and bounded native Review/Search/Settings are now present in code. Native visual/accessibility/runtime evidence and production provider/reminder gates are still outstanding. Full remaining work is in [implementation-audit.md](implementation-audit.md).
+
+## Native design/runtime milestone — 2026-09-30
+
+- `pnpm test`: **59 pass**, five DB tests intentionally skipped without integration configuration. New regression protects civil date formatting from Temporal/Intl bridging and date shifts. Prior real Neon 5/5 evidence remains; no DB change in this design pass.
+- `pnpm typecheck`: all nine packages pass; `pnpm lint`: import boundaries pass. Final sheet/date refinements also pass native typecheck. `git diff --check` passes.
+- `TEST_BASE_URL=http://localhost:3001 pnpm test:e2e`: **12/12 pass** in 21.1 seconds. This closes the pending browser regression check after the shared helper refactor.
+- Signed iOS simulator Release rebuild passes, Xcode 26.2 / iPhone 17 Pro / iOS 26.2 / Expo 55.0.31 / RN 0.83.10. Android Hermes export passes; final sheet/date-label refinements were subsequently checked in the iOS build and native TypeScript, not re-exported on Android.
+- Local SMTP native sign-in/verification succeeds. The previous Keychain failure was specific to the unsigned artifact. Authenticating exposed a real Hermes date-heading crash; the final build now renders Day/Week/Month without it.
+- Native interaction proof: title-only creation; duration/priority/daily recurrence and five-date preview; a future-scoped title edit; completion and Undo; all four tabs; real title search; sign-out and email reauthentication. A final separate scope step is visibly reachable immediately after Save.
+- Backend stopped: created a plan locally, terminated/relaunched the embedded app, verified the plan and pending operation, completed it, then restarted the backend. Sync now produced Synced and zero pending. After sign-out/local purge, reauthentication/bootstrap restored all three plans and the completion. This verifies server persistence as well as local restart; it is not web/mobile concurrent-edit or physical airplane-mode proof.
+- Native screenshots under `docs/evidence/mobile-*-ios.png` show only synthetic planner content or signed-out UI. No authentication material is stored in those files.
+- Still pending: Android installed runtime, physical provider/push flows, full native gesture/large-text/landscape/keyboard matrix and automated Maestro execution. No stage acceptance was promoted to complete.
+
+- Final scope-flow proof: changed duration from 20 to 25 minutes with Only this occurrence; today rendered 25 and next day rendered 20. The scope step was captured in `mobile-scope-ios.png`. Measured normal-text contrast and corrected muted-on-lime captions to navy (13.07:1); white/blue 5.86:1, muted/white 4.80:1 and muted/warm 4.54:1.

@@ -51,14 +51,12 @@ describe.skipIf(!enabled)(
       api!.push(ownerId, { protocolVersion: 1, deviceId, operations });
     beforeAll(async () => {
       for (const id of owners) {
-        await db!
-          .insert(user)
-          .values({
-            id,
-            name: "Synthetic test",
-            email: `${id}@example.test`,
-            emailVerified: true,
-          });
+        await db!.insert(user).values({
+          id,
+          name: "Synthetic test",
+          email: `${id}@example.test`,
+          emailVerified: true,
+        });
         await api!.register(id, {
           id: deviceId,
           platform: "web",
@@ -146,6 +144,60 @@ describe.skipIf(!enabled)(
       expect(
         await api!.bootstrap(owners[1]!, { token: snapshot.token }),
       ).toEqual({ expired: true });
+    });
+    it("persists scoped deletion undo atomically and replays its exact response", async () => {
+      const createCommand = create();
+      if (createCommand.command.type !== "create")
+        throw new Error("Expected create");
+      createCommand.command.task.rule = {
+        frequency: "daily",
+        anchor: "2026-09-29",
+        interval: 1,
+        end: { kind: "never" },
+        invalidDate: "clamp",
+      };
+      const created = await push(owners[0]!, [createCommand]);
+      const item = projectSeries(
+        reduceRecord(created.results[0]!.record),
+        "2026-09-30",
+        "2026-09-30",
+      )[0]!;
+      const target = occurrenceTarget(item);
+      const remove = op(createCommand.definitionId, {
+        type: "delete",
+        target,
+        scope: "future",
+      });
+      const removed = await push(owners[0]!, [remove]);
+      expect(
+        projectSeries(
+          reduceRecord(removed.results[0]!.record),
+          "2026-09-30",
+          "2026-10-02",
+        ),
+      ).toHaveLength(0);
+      const restore = op(
+        createCommand.definitionId,
+        { type: "restore", target, scope: "future", deletionId: remove.id },
+        remove.stamp.physical + 1,
+      );
+      const restored = await push(owners[0]!, [restore]);
+      expect(
+        projectSeries(
+          reduceRecord(restored.results[0]!.record),
+          "2026-09-30",
+          "2026-10-02",
+        ),
+      ).toHaveLength(3);
+      expect((await push(owners[0]!, [restore])).results).toEqual(
+        restored.results,
+      );
+      expect(
+        await db!
+          .select()
+          .from(jobOutbox)
+          .where(eq(jobOutbox.operationId, restore.id)),
+      ).toHaveLength(1);
     });
     it("holds a stable paginated snapshot while overlapping commits produce consecutive cursors", async () => {
       const snapshot = await api!.bootstrap(owners[0]!, { limit: 1 });

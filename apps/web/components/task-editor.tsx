@@ -6,7 +6,7 @@ import {
   type Rule,
   type Occurrence,
 } from "@timely/contracts";
-import { date, preview, ruleSummary } from "@timely/domain";
+import { date, preview, ruleSummary, recurrencePreset } from "@timely/domain";
 type Props = {
   initial: Task;
   occurrence?: Occurrence;
@@ -29,47 +29,21 @@ export function TaskEditor({ initial, occurrence, onSave, onClose }: Props) {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     element.showModal();
-    return () => { element.close(); document.body.style.overflow = previousOverflow; };
+    return () => {
+      element.close();
+      document.body.style.overflow = previousOverflow;
+    };
   }, []);
   const patch = (change: Partial<Task>) =>
     setTask((value) => ({ ...value, ...change }));
   const setRule = (change: Partial<Rule>) =>
     patch({ rule: { ...task.rule!, ...change } as Rule });
   function frequency(value: string) {
-    if (value === "none") {
-      patch({ rule: null });
-      return;
-    }
-    const day = date(task.schedule.date);
-    const base = {
-      anchor: task.schedule.date,
-      interval: 1,
-      end: { kind: "never" as const },
-      invalidDate: "clamp" as const,
-    };
     patch({
-      rule:
-        value === "daily"
-          ? { ...base, frequency: "daily" }
-          : value === "weekly"
-            ? {
-                ...base,
-                frequency: "weekly",
-                weekdays: [day.dayOfWeek],
-                firstWeekday: 1,
-              }
-            : value === "monthly"
-              ? {
-                  ...base,
-                  frequency: "monthly",
-                  selector: { kind: "days", days: [day.day] },
-                }
-              : {
-                  ...base,
-                  frequency: "yearly",
-                  month: day.month,
-                  selector: { kind: "days", days: [day.day] },
-                },
+      rule: recurrencePreset(
+        value as Parameters<typeof recurrencePreset>[0],
+        task.schedule.date,
+      ),
     });
   }
   let nextDates: string[] = [];

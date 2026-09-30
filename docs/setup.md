@@ -2,7 +2,7 @@
 
 ## Current implementation
 
-The repository currently contains the retained stage 00 authentication proof, workspace foundation, and shared recurrence/time/conflict-ordering modules. It is not yet a complete planner. See [progress](progress.md) for exact implementation and verification gates.
+The repository contains real web email authentication, a local-first web planner, shared recurrence/time/sync modules, Neon development persistence and a substantial native planner implementation. Native runtime acceptance and several later-stage features remain incomplete. See [progress](progress.md) for exact implementation and verification gates.
 
 Prerequisites: Node 22.13+ (tested on 24.19.0), pnpm 10.7.0, Docker Desktop for local PostgreSQL/Mailpit, Xcode for iOS and Android Studio for Android. Native social sign-in requires a development build, not Expo Go.
 
@@ -78,7 +78,7 @@ pnpm dev:mobile
 
 EAS profiles in `apps/mobile/eas.json` separate development, preview and production app IDs/schemes. Register actual IDs/callbacks before EAS builds. Configure signing through your Apple/Google accounts. No store submission or paid build purchase has been performed.
 
-Native sessions use Better Auth Expo secure storage. Protected API requests await `getCookie()` and send it with `credentials: 'omit'`. Verify restart restoration and sign-out using the protected account proof button. Native full planner/offline storage is not yet implemented.
+Native sessions use Better Auth Expo secure storage. Protected API requests await `getCookie()` and send it with `credentials: 'omit'`. Verify restart restoration and sign-out in the native account/planner flow. SQLite-backed planner code exists, but actual authenticated offline restart and cross-client convergence remain acceptance checks. See `docs/mobile-verification.md`.
 
 ## Rotation
 
@@ -107,4 +107,4 @@ TEST_BASE_URL=http://localhost:3001 pnpm test:e2e
 
 `APP_ENV=local` allows capture mail in a built app only when both the backend URL and database URL are loopback hosts. It still sends real SMTP and uses real Better Auth sessions. Hosted production requires Resend configuration. Browser fixtures represent separate synthetic client IPs for the authentication rate limiter and poll for actual mail delivery; no OTP or session token is written to evidence.
 
-Web navigation is Planner / Review / Search / Settings. The current Review and Search cover the selected downloaded period. Overdue display covers the preceding year and labels that coverage. Broader history, synchronized preferences, recovery/discard controls, drag/reorder and release notification delivery remain under implementation. The native planner can create tasks and complete/skip/move/delete synchronized occurrences; custom recurrence editing is currently on web.
+Web navigation is Planner / Review / Search / Settings. The current Review and Search cover the selected downloaded period. Overdue display covers the preceding year and labels that coverage. Broader history, synchronized preferences, recovery/discard controls, drag/reorder and release notification delivery remain under implementation. Native code now includes all four destinations, custom recurrence editing/scopes, scoped delete/Undo, explicit reorder and safe deep links. These additions still need authenticated native runtime verification; see `docs/implementation-audit.md` for the complete remaining work.

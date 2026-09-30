@@ -75,9 +75,14 @@ export const commandSchema = z.discriminatedUnion("type", [
     .object({
       type: z.literal("restore"),
       target: targetSchema,
-      scope: z.enum(["occurrence", "series"]),
+      scope,
+      deletionId: id.optional(),
     })
-    .strict(),
+    .strict()
+    .refine(
+      (c) => c.scope !== "future" || !!c.deletionId,
+      "Restoring a future range requires its deletion operation",
+    ),
   z
     .object({
       type: z.literal("order"),

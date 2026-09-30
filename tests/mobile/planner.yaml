@@ -1,0 +1,39 @@
+# Run after real email sign-in on a disposable development account.
+# Authentication material must not be put in Maestro flows or test artifacts.
+appId: com.example.timely.dev
+---
+- launchApp
+- assertVisible: "Your day, your pace."
+- tapOn: "Add task"
+- tapOn: "Task title"
+- inputText: "A native restart check"
+- hideKeyboard
+- tapOn: "Save task"
+- scrollUntilVisible:
+    element:
+      text: "A native restart check"
+    direction: DOWN
+- assertVisible: "A native restart check"
+- stopApp
+- launchApp
+- scrollUntilVisible:
+    element:
+      text: "A native restart check"
+    direction: DOWN
+- tapOn: "Complete A native restart check"
+- scrollUntilVisible:
+    element:
+      text: "Show completed & skipped.*"
+    direction: DOWN
+- tapOn: "Show completed & skipped.*"
+- assertVisible: "Reopen A native restart check"
+- tapOn: "Search, tab, 3 of 4"
+- assertVisible: "Find a plan"
+- tapOn: "Search titles and notes"
+- inputText: "A native restart check"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "A native restart check"
+    direction: DOWN
+- assertVisible: "A native restart check"

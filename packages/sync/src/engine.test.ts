@@ -205,3 +205,48 @@ it("rebases a local edit authored during pull onto the newer canonical shadow", 
     projectSeries(reduceRecord(visible), "2026-09-29", "2026-09-29")[0]!.title,
   ).toBe("Still here");
 });
+
+it("commits a reorder batch atomically and rolls back every command if one is invalid", async () => {
+  const { saveLocalBatch } = await import("./engine");
+  const { reorderCommands } = await import("./planner-actions");
+  const { compareOccurrences } = await import("@timely/domain");
+  const store = memory();
+  const first = task(),
+    second = task();
+  await saveLocalBatch(
+    store,
+    [
+      { definitionId: first.id, command: { type: "create", task: first } },
+      { definitionId: second.id, command: { type: "create", task: second } },
+    ],
+    randomUUID,
+  );
+  const items = visibleRecords(await store.read())
+    .records.flatMap((r) =>
+      projectSeries(reduceRecord(r), "2026-09-29", "2026-09-29"),
+    )
+    .sort(compareOccurrences);
+  const changes = reorderCommands(items, items[1]!, -1);
+  const before = await store.read();
+  await expect(
+    saveLocalBatch(
+      store,
+      [
+        ...changes,
+        { definitionId: first.id, command: { type: "create", task: first } },
+      ],
+      randomUUID,
+    ),
+  ).rejects.toThrow();
+  expect(await store.read()).toEqual(before);
+  await saveLocalBatch(store, changes, randomUUID);
+  const reordered = visibleRecords(await store.read())
+    .records.flatMap((r) =>
+      projectSeries(reduceRecord(r), "2026-09-29", "2026-09-29"),
+    )
+    .sort(compareOccurrences);
+  expect(reordered.map((i) => i.id)).toEqual(items.map((i) => i.id).reverse());
+  expect(reordered.map((i) => i.schedule)).toEqual(
+    items.map((i) => i.schedule),
+  );
+});

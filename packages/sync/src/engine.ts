@@ -75,25 +75,40 @@ export async function saveLocal(
   uuid: () => string,
   now = Date.now(),
 ) {
+  return (
+    await saveLocalBatch(store, [{ definitionId, command }], uuid, now)
+  )[0]!;
+}
+/** Reordering several siblings commits all projections and outbox writes together. */
+export async function saveLocalBatch(
+  store: LocalStore,
+  changes: Array<{ definitionId: string; command: Command }>,
+  uuid: () => string,
+  now = Date.now(),
+) {
   return store.transaction((state) => {
-    const id = uuid();
-    const advanced = tick(state.clock, now, state.deviceId, id);
-    const operation = operationSchema.parse({
-      protocolVersion: 1,
-      id,
-      deviceId: state.deviceId,
-      definitionId,
-      command,
-      stamp: advanced.stamp,
-      createdAt: new Date(now).toISOString(),
-    });
-    const record = visibleRecords(state).records.find(
-      (r) => r.id === definitionId,
-    );
-    appendOperation(record, operation); // Invalid local commands never enter the outbox.
-    state.clock = advanced.clock;
-    state.outbox.push({ operation, attempts: 0, retryAt: 0 });
-    return operation;
+    const operations: Operation[] = [];
+    for (const { definitionId, command } of changes) {
+      const id = uuid();
+      const advanced = tick(state.clock, now, state.deviceId, id);
+      const operation = operationSchema.parse({
+        protocolVersion: 1,
+        id,
+        deviceId: state.deviceId,
+        definitionId,
+        command,
+        stamp: advanced.stamp,
+        createdAt: new Date(now).toISOString(),
+      });
+      const record = visibleRecords(state).records.find(
+        (r) => r.id === definitionId,
+      );
+      appendOperation(record, operation); // Invalid local commands never enter the outbox.
+      state.clock = advanced.clock;
+      state.outbox.push({ operation, attempts: 0, retryAt: 0 });
+      operations.push(operation);
+    }
+    return operations;
   });
 }
 export class SyncError extends Error {

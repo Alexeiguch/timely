@@ -17,6 +17,10 @@ import {
 } from "lucide-react";
 import {
   addDays,
+  adjacentPeriod,
+  compareOccurrences,
+  newTask,
+  periodWindow,
   date,
   projectSeries,
   progress,
@@ -24,7 +28,12 @@ import {
   status,
   today,
 } from "@timely/domain";
-import { occurrenceTarget, reduceRecord } from "@timely/sync";
+import {
+  occurrenceTarget,
+  reduceRecord,
+  editableTask,
+  editorCommand,
+} from "@timely/sync";
 import type { Occurrence, Task, TaskRecord } from "@timely/contracts";
 import { usePlanner } from "../lib/use-planner";
 import { TaskEditor } from "./task-editor";
@@ -63,23 +72,12 @@ export function Planner({
     const interval = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(interval);
   }, []);
-  const from =
-    mode === "Day"
-      ? selected
-      : mode === "Week"
-        ? addDays(selected, 1 - date(selected).dayOfWeek)
-        : date(selected).with({ day: 1 }).toString();
-  const through =
-    mode === "Day"
-      ? selected
-      : mode === "Week"
-        ? addDays(from, 6)
-        : date(from).add({ months: 1 }).subtract({ days: 1 }).toString();
+  const { from, through } = periodWindow(selected, mode);
   const all = useMemo(
     () =>
-      planner.records.flatMap((record) =>
-        projectSeries(reduceRecord(record), from, through),
-      ),
+      planner.records
+        .flatMap((record) => projectSeries(reduceRecord(record), from, through))
+        .sort(compareOccurrences),
     [planner.records, from, through],
   );
   const overdue = useMemo(
@@ -99,15 +97,7 @@ export function Planner({
     [planner.records, currentDay, from, zone, now],
   );
   const totals = progress(all, zone, now);
-  const blank = (): Task => ({
-    id: crypto.randomUUID(),
-    title: "",
-    notes: "",
-    priority: null,
-    schedule: { date: selected, time: null, duration: null },
-    reminders: { enabled: false, before: true, overdue: true },
-    rule: null,
-  });
+  const blank = (): Task => newTask(crypto.randomUUID(), selected);
   async function action(work: () => Promise<unknown>) {
     try {
       await work();
@@ -127,55 +117,24 @@ export function Planner({
   }
   function edit(item: Occurrence) {
     const record = planner.records.find((r) => r.id === item.definitionId)!;
-    const series = reduceRecord(record);
-    const source = series.revisions.find((r) => r.id === item.revisionId)!;
-    setEditor({
-      task: {
-        id: item.definitionId,
-        title: item.title,
-        notes: item.notes,
-        priority: item.priority,
-        schedule: item.schedule,
-        reminders: item.reminders,
-        rule: source.task.rule,
-      },
-      occurrence: item,
-    });
+    setEditor({ task: editableTask(record, item), occurrence: item });
   }
   async function saveEditor(
     task: Task,
     scope: "occurrence" | "future" | "series",
   ) {
-    if (!editor?.occurrence) {
-      await planner.save(task.id, { type: "create", task });
-      return;
-    }
-    const patch: Record<string, unknown> = {};
-    for (const key of [
-      "title",
-      "notes",
-      "priority",
-      "schedule",
-      "reminders",
-      "rule",
-    ] as const)
-      if (JSON.stringify(task[key]) !== JSON.stringify(editor.task[key]))
-        patch[key] = task[key];
-    if (Object.keys(patch).length)
-      await planner.save(task.id, {
-        type: "edit",
-        target: occurrenceTarget(editor.occurrence),
-        scope: !editor.task.rule && task.rule ? "series" : scope,
-        patch,
-        currentDay,
-      });
+    if (!editor) return;
+    const command = editorCommand(
+      editor.task,
+      task,
+      editor.occurrence,
+      scope,
+      currentDay,
+    );
+    if (command) await planner.save(task.id, command);
   }
   function movePeriod(direction: number) {
-    setSelected(
-      mode === "Month"
-        ? date(selected).add({ months: direction }).toString()
-        : addDays(selected, direction * (mode === "Week" ? 7 : 1)),
-    );
+    setSelected(adjacentPeriod(selected, mode, direction));
   }
   function card(item: Occurrence) {
     const state = status(item, zone, now);

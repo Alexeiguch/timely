@@ -18,3 +18,7 @@ playwright-report/
 
 # Downloaded OAuth client credentials
 client_secret_*.json
+
+# Expo Continuous Native Generation output
+apps/mobile/ios/
+apps/mobile/android/

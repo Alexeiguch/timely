@@ -80,6 +80,30 @@ export function resolveTarget(series: Series, target: Target) {
  * Structural dependencies are resolved before their consumers, including offline-created revisions.
  */
 export function reduceRecord(record: TaskRecord): Series {
+  // Undo targets one deletion, preserving later deletions and every unrelated edit.
+  // Both operations remain in the journal; replay omits only the explicitly undone tombstone.
+  const restored = new Set<string>();
+  for (const operation of record.operations) {
+    const command = operation.command;
+    if (command.type !== "restore" || !command.deletionId) continue;
+    const deletion = record.operations.find((o) => o.id === command.deletionId);
+    if (
+      !deletion ||
+      deletion.command.type !== "delete" ||
+      deletion.command.scope !== command.scope ||
+      (["id", "revisionId", "slot", "originalDate"] as const).some(
+        (key) =>
+          deletion.command.type !== "delete" ||
+          deletion.command.target[key] !== command.target[key],
+      ) ||
+      compare(operation.stamp, deletion.stamp) <= 0
+    )
+      throw new CommandError(
+        "INVALID_COMMAND",
+        "Undo must reference an earlier matching deletion.",
+      );
+    restored.add(deletion.id);
+  }
   const creates = record.operations.filter((o) => o.command.type === "create");
   if (creates.length !== 1)
     throw new CommandError(
@@ -113,6 +137,11 @@ export function reduceRecord(record: TaskRecord): Series {
         "A task cannot be created twice.",
       );
     const selected = resolveTarget(series, command.target);
+    if (
+      restored.has(operation!.id) ||
+      (command.type === "restore" && command.deletionId)
+    )
+      continue;
     if (command.type === "delete")
       series = deleteSeries(series, selected, command.scope);
     else if (command.type === "restore") {
