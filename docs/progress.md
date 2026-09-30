@@ -113,3 +113,9 @@ Never put secrets, OTPs or sessions into these documents. Neon authentication/se
 - Added the existing blue/lime Timely logo as the opaque 1024px iOS app icon, Android adaptive/themed icons and centered launch-screen artwork. Native header/sign-in branding now uses the same mark. Assets are reproducibly derived from the web SVG with `node scripts/generate-mobile-brand.mjs`.
 - Splash screen remains visible until fonts load or fail, with the established warm background. Expo splash configuration follows the installed SDK 55 plugin.
 - Verification: native TypeScript passes, iOS and Android prebuilds pass, signed iOS Release build passes, installed icon visually verified on the simulator home screen and header on sign-in. Evidence: `evidence/mobile-app-icon-ios.png`. Android launcher runtime and a captured cold-launch splash frame remain unverified; no claim of those checks. Build log: `/tmp/timely-logo-build.log`.
+
+## VS Code mobile debugging — 2026-09-30
+
+- Replaced the mobile folder's bare React Native/Node launch entries with Expo Tools Hermes attach configuration. Added matching root/folder tasks, extension recommendations and `mobile-debugging.md`. Existing owner edits to `apps/mobile/package.json` were preserved and excluded from this checkpoint.
+- Started Metro in VS Code, built and installed the signed iOS Debug app, connected to localhost:8081 and verified an actual breakpoint at `src/brand.tsx:4`, with original source/variables/call stack. Left the session paused for the owner. API remains localhost:3001.
+- Native TypeScript passes; configuration JSON parses. No new business tests needed. Expo-generated tsconfig removal was reverted; local React Native Tools cache is ignored.

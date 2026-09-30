@@ -22,3 +22,6 @@ client_secret_*.json
 # Expo Continuous Native Generation output
 apps/mobile/ios/
 apps/mobile/android/
+
+# Local React Native Tools cache
+**/.vscode/.react/

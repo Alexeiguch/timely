@@ -1,0 +1,72 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Mobile: Start Metro",
+      "type": "shell",
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "expo",
+        "start",
+        "--dev-client",
+        "--localhost",
+        "--port",
+        "8081"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "EXPO_PUBLIC_API_URL": "http://localhost:3001",
+          "APP_VARIANT": "development",
+          "REACT_NATIVE_PACKAGER_HOSTNAME": "localhost"
+        }
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "expo",
+        "pattern": {
+          "regexp": "^(?!)()()()$",
+          "file": 1,
+          "location": 2,
+          "message": 3
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*Starting project.*",
+          "endsPattern": ".*(Metro waiting on|Waiting on http|Metro:).*"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "runOptions": {
+        "instanceLimit": 1
+      }
+    },
+    {
+      "label": "Mobile: Build iOS development app",
+      "type": "shell",
+      "command": "pnpm",
+      "args": [
+        "exec",
+        "expo",
+        "run:ios",
+        "--no-bundler"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "EXPO_PUBLIC_API_URL": "http://localhost:3001",
+          "APP_VARIANT": "development"
+        }
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    }
+  ]
+}
