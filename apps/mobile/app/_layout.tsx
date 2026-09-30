@@ -1,5 +1,7 @@
 import { Stack, type ErrorBoundaryProps } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useEffect } from "react";
+import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import { Baloo2_700Bold } from "@expo-google-fonts/baloo-2/700Bold";
 import { NunitoSans_400Regular } from "@expo-google-fonts/nunito-sans/400Regular";
@@ -8,12 +10,17 @@ import { Text, View } from "react-native";
 import { colors } from "@timely/design";
 import { AccountProvider } from "../src/account";
 import { Button, s } from "../src/ui";
+void SplashScreen.preventAutoHideAsync();
+
 export default function Layout() {
   const [loaded, error] = useFonts({
     Baloo2: Baloo2_700Bold,
     NunitoSans: NunitoSans_400Regular,
     NunitoSansBold: NunitoSans_700Bold,
   });
+  useEffect(() => {
+    if (loaded || error) SplashScreen.hide();
+  }, [loaded, error]);
   if (!loaded && !error)
     return (
       <View style={[s.screen, s.page]}>
