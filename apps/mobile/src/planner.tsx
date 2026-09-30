@@ -61,7 +61,7 @@ export function NativePlanner() {
     ownerId?: string;
   }>();
   const processedLink = useRef("");
-  const window = periodWindow(p.selected, p.mode);
+  const window = periodWindow(p.selected, p.mode, p.preferences.firstWeekday);
   const series = useMemo(() => p.records.map(reduceRecord), [p.records]);
   const all = useMemo(
     () =>
@@ -404,51 +404,58 @@ export function NativePlanner() {
                 <ScrollView horizontal>
                   <View style={styles.calendar}>
                     <View style={styles.calendarGrid}>
-                      {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
+                      {Array.from(
+                        { length: 7 },
+                        (_, i) =>
+                          ["M", "T", "W", "T", "F", "S", "S"][
+                            (p.preferences.firstWeekday - 1 + i) % 7
+                          ],
+                      ).map((d, i) => (
                         <Text key={i} style={[s.muted, styles.weekday]}>
                           {d}
                         </Text>
                       ))}
-                      {calendarDays(p.selected).map((day, i) =>
-                        day ? (
-                          <Pressable
-                            key={day}
-                            accessibilityRole="button"
-                            accessibilityState={{
-                              selected: day === p.selected,
-                            }}
-                            accessibilityLabel={`${day}, ${all.filter((item) => item.schedule.date === day).length} tasks`}
-                            style={[
-                              styles.day,
-                              day === p.selected && styles.selectedDay,
-                            ]}
-                            onPress={() => {
-                              p.setSelected(day);
-                              p.setMode("Day");
-                            }}
-                          >
-                            <Text
+                      {calendarDays(p.selected, p.preferences.firstWeekday).map(
+                        (day, i) =>
+                          day ? (
+                            <Pressable
+                              key={day}
+                              accessibilityRole="button"
+                              accessibilityState={{
+                                selected: day === p.selected,
+                              }}
+                              accessibilityLabel={`${day}, ${all.filter((item) => item.schedule.date === day).length} tasks`}
                               style={[
-                                s.body,
-                                day === p.selected && s.activeText,
+                                styles.day,
+                                day === p.selected && styles.selectedDay,
                               ]}
+                              onPress={() => {
+                                p.setSelected(day);
+                                p.setMode("Day");
+                              }}
                             >
-                              {date(day).day}
-                            </Text>
-                            <Text
-                              style={[
-                                styles.dot,
-                                day === p.selected && s.activeText,
-                              ]}
-                            >
-                              {all.some((item) => item.schedule.date === day)
-                                ? "•"
-                                : " "}
-                            </Text>
-                          </Pressable>
-                        ) : (
-                          <View key={`blank-${i}`} style={styles.day} />
-                        ),
+                              <Text
+                                style={[
+                                  s.body,
+                                  day === p.selected && s.activeText,
+                                ]}
+                              >
+                                {date(day).day}
+                              </Text>
+                              <Text
+                                style={[
+                                  styles.dot,
+                                  day === p.selected && s.activeText,
+                                ]}
+                              >
+                                {all.some((item) => item.schedule.date === day)
+                                  ? "•"
+                                  : " "}
+                              </Text>
+                            </Pressable>
+                          ) : (
+                            <View key={`blank-${i}`} style={styles.day} />
+                          ),
                       )}
                     </View>
                   </View>

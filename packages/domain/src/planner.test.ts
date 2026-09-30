@@ -99,3 +99,17 @@ it("formats civil dates without shifting the authored day or using Temporal's In
   ).toBe("1 Jan 1900");
   expect(() => formatCivilDate("2028-02-30", {})).toThrow();
 });
+
+it("aligns all first-weekday choices without modifying stored recurrence anchors", () => {
+  const rule = recurrencePreset("weekly", "2026-09-30")!;
+  const original = structuredClone(rule);
+  for (let first = 1; first <= 7; first++) {
+    const days = calendarDays("2026-10-14", first);
+    expect(days.indexOf("2026-10-01")).toBe((4 - first + 7) % 7);
+    expect(days.filter(Boolean)).toHaveLength(31);
+    expect(days.length % 7).toBe(0);
+    periodWindow("2026-10-14", "Week", first);
+  }
+  expect(rule).toEqual(original);
+  expect(() => calendarDays("2026-10-14", 0)).toThrow();
+});

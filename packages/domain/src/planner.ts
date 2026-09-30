@@ -1,5 +1,6 @@
 import {
   civilDate,
+  weekday,
   type Occurrence,
   type Rule,
   type Task,
@@ -16,6 +17,7 @@ export function clampDay(day: string) {
 }
 export function periodWindow(day: string, mode: PlannerMode, firstWeekday = 1) {
   civilDate.parse(day);
+  weekday.parse(firstWeekday);
   const value = date(day);
   const start =
     mode === "Day"
@@ -42,9 +44,15 @@ export function adjacentPeriod(
       : addDays(day, direction * (mode === "Week" ? 7 : 1)),
   );
 }
-export function calendarDays(day: string): Array<string | null> {
+export function calendarDays(
+  day: string,
+  firstWeekday = 1,
+): Array<string | null> {
+  weekday.parse(firstWeekday);
   const first = date(day).with({ day: 1 });
-  const days: Array<string | null> = Array(first.dayOfWeek - 1).fill(null);
+  const days: Array<string | null> = Array(
+    (first.dayOfWeek - firstWeekday + 7) % 7,
+  ).fill(null);
   for (let d = 1; d <= first.daysInMonth; d++)
     days.push(first.with({ day: d }).toString());
   while (days.length % 7) days.push(null);

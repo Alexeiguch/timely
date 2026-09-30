@@ -5,6 +5,7 @@ import { Baloo2_700Bold } from "@expo-google-fonts/baloo-2/700Bold";
 import { NunitoSans_400Regular } from "@expo-google-fonts/nunito-sans/400Regular";
 import { NunitoSans_700Bold } from "@expo-google-fonts/nunito-sans/700Bold";
 import { Text, View } from "react-native";
+import { colors } from "@timely/design";
 import { AccountProvider } from "../src/account";
 import { Button, s } from "../src/ui";
 export default function Layout() {
@@ -22,7 +23,12 @@ export default function Layout() {
   return (
     <SafeAreaProvider>
       <AccountProvider>
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        >
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="sign-in" options={{ presentation: "modal" }} />
         </Stack>

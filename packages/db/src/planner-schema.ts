@@ -13,6 +13,9 @@ import {
 } from "drizzle-orm/pg-core";
 import type {
   Operation,
+  SyncOperation,
+  SyncRecord,
+  PreferenceRecord,
   Outcome,
   TaskRecord,
   Occurrence,
@@ -39,6 +42,11 @@ export const taskDefinitions = timelySchema.table(
   },
   (t) => [primaryKey({ columns: [t.ownerId, t.id] })],
 );
+export const userPreferences = timelySchema.table("user_preferences", {
+  ownerId: owner().primaryKey(),
+  record: jsonb("record").$type<PreferenceRecord>().notNull(),
+  updatedAt: at(),
+});
 export const recurrenceRevisions = timelySchema.table(
   "recurrence_revisions",
   {
@@ -94,7 +102,7 @@ export const syncOperations = timelySchema.table(
     id: uuid("id").notNull(),
     deviceId: uuid("device_id").notNull(),
     fingerprint: text("fingerprint").notNull(),
-    command: jsonb("command").$type<Operation>().notNull(),
+    command: jsonb("command").$type<SyncOperation>().notNull(),
     result: jsonb("result").$type<Outcome>().notNull(),
     receivedAt: at(),
   },
@@ -105,7 +113,7 @@ export const syncChanges = timelySchema.table(
   {
     ownerId: owner(),
     cursor: bigint("cursor", { mode: "number" }).notNull(),
-    record: jsonb("record").$type<TaskRecord>().notNull(),
+    record: jsonb("record").$type<SyncRecord>().notNull(),
     createdAt: at(),
   },
   (t) => [primaryKey({ columns: [t.ownerId, t.cursor] })],
@@ -126,7 +134,7 @@ export const jobOutbox = timelySchema.table(
   {
     ownerId: owner(),
     operationId: uuid("operation_id").notNull(),
-    definitionId: uuid("definition_id").notNull(),
+    definitionId: uuid("definition_id"),
     type: text("type").notNull(),
     attempts: integer("attempts").notNull().default(0),
     processedAt: timestamp("processed_at", { withTimezone: true }),
@@ -153,7 +161,7 @@ export const snapshotItems = timelySchema.table(
     ownerId: owner(),
     token: uuid("token").notNull(),
     position: integer("position").notNull(),
-    record: jsonb("record").$type<TaskRecord>().notNull(),
+    record: jsonb("record").$type<SyncRecord>().notNull(),
   },
   (t) => [primaryKey({ columns: [t.ownerId, t.token, t.position] })],
 );

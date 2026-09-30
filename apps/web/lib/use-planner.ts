@@ -5,10 +5,12 @@ import {
   saveLocal,
   SyncEngine,
   visibleRecords,
+  visiblePreferences,
+  savePreferences,
   type LocalState,
   type SyncStatus,
 } from "@timely/sync";
-import type { Command } from "@timely/contracts";
+import type { Command, PreferencePatch } from "@timely/contracts";
 import { localStore } from "./local-store";
 export function usePlanner(ownerId: string) {
   const store = useMemo(() => localStore(ownerId), [ownerId]);
@@ -70,6 +72,12 @@ export function usePlanner(ownerId: string) {
   }, [store, sync]);
   return {
     state,
+    preferences: visiblePreferences(state),
+    async setPreferences(patch: PreferencePatch) {
+      await savePreferences(store, patch, () => crypto.randomUUID());
+      setSyncStatus(navigator.onLine ? "Saved locally" : "Offline");
+      void sync();
+    },
     records: state ? visibleRecords(state).records : [],
     syncStatus,
     message,

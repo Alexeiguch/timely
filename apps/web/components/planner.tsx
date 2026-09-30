@@ -66,13 +66,15 @@ export function Planner({
     occurrence?: Occurrence;
   } | null>(null);
   const [error, setError] = useState("");
-  const [grouped, setGrouped] = useState(true);
   const planner = usePlanner(identity.id);
+  const { grouped, firstWeekday } = planner.preferences;
+  const setGrouped = (value: boolean) =>
+    void action(() => planner.setPreferences({ grouped: value }));
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(interval);
   }, []);
-  const { from, through } = periodWindow(selected, mode);
+  const { from, through } = periodWindow(selected, mode, firstWeekday);
   const all = useMemo(
     () =>
       planner.records
@@ -426,13 +428,17 @@ export function Planner({
             {mode === "Month" && (
               <>
                 <div className="month-grid" aria-label="Month dates">
-                  {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
-                    (day) => (
-                      <small key={day} className="weekday-label">
-                        {day}
-                      </small>
-                    ),
-                  )}
+                  {Array.from(
+                    { length: 7 },
+                    (_, i) =>
+                      ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][
+                        (firstWeekday - 1 + i) % 7
+                      ],
+                  ).map((day) => (
+                    <small key={day} className="weekday-label">
+                      {day}
+                    </small>
+                  ))}
                   {Array.from({ length: date(from).daysInMonth }, (_, i) => {
                     const day = addDays(from, i);
                     return (
@@ -440,7 +446,12 @@ export function Planner({
                         key={day}
                         style={
                           i === 0
-                            ? { gridColumnStart: date(from).dayOfWeek }
+                            ? {
+                                gridColumnStart:
+                                  ((date(from).dayOfWeek - firstWeekday + 7) %
+                                    7) +
+                                  1,
+                              }
                             : undefined
                         }
                         aria-label={`${label(day, { day: "numeric", month: "long" })}, ${all.filter((item) => item.schedule.date === day).length} tasks`}
@@ -597,6 +608,49 @@ export function Planner({
         )}
         {tab === "Settings" && (
           <section className="settings-card">
+            <h2>Calendar preferences</h2>
+            <p>Saved on this device and synchronized with your account.</p>
+            <label>
+              First day of the week
+              <select
+                aria-label="First day of the week"
+                value={firstWeekday}
+                onChange={(event) =>
+                  void action(() =>
+                    planner.setPreferences({
+                      firstWeekday: Number(event.target.value),
+                    }),
+                  )
+                }
+              >
+                {[
+                  "Monday",
+                  "Tuesday",
+                  "Wednesday",
+                  "Thursday",
+                  "Friday",
+                  "Saturday",
+                  "Sunday",
+                ].map((day, i) => (
+                  <option key={day} value={i + 1}>
+                    {day}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Month view
+              <select
+                aria-label="Month view"
+                value={grouped ? "grouped" : "all"}
+                onChange={(event) =>
+                  setGrouped(event.target.value === "grouped")
+                }
+              >
+                <option value="grouped">Grouped</option>
+                <option value="all">All occurrences</option>
+              </select>
+            </label>
             <h2>Your account</h2>
             <p>{identity.email}</p>
             <dl>

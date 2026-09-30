@@ -98,3 +98,12 @@ Never put secrets, OTPs or sessions into these documents. Neon authentication/se
 - Current local API preview: port 3001. Latest iOS build log `/tmp/timely-mobile-design-build.log`; artifact path unchanged. The final scope chooser is immediately visible after Save; occurrence-only duration edit persisted at 25 minutes while tomorrow retained 20.
 
 - Measured contrast: white/blue 5.86:1, navy/warm 13.68:1, muted/white 4.80:1, muted/warm 4.54:1. Muted/lime was 4.34:1, so accent-surface captions now use navy/lime at 13.07:1. Full accessibility acceptance remains pending.
+
+## Bottom navigation and synchronized calendar preferences — 2026-09-30
+
+- Replaced the native rectangular tab selection with an inset rounded dock, compact blue icon pill, consistent icon weights, safe-area spacing and labels that retain font scaling. Kept the standard tab navigator's accessibility and navigation behavior.
+- Added durable, account-scoped first-weekday and month-grouping settings to both clients. They use atomic local outbox writes, canonical field-group ordering, deduplicated push, feed and fixed snapshots. Calendar layout updates immediately without changing stored recurrence anchors. See [ADR 006](decisions/006-synchronized-preferences.md).
+- Migration 0002 applied to local development Postgres and the isolated Neon development branch. Production hello project remains unchanged.
+- Automated checks: 62 unit tests; all nine workspace type checks; boundary lint; web production build; signed iOS simulator build. All six real Neon transaction tests pass, including preference deduplication, delayed older writes, independent groups, cross-owner isolation, stable paginated snapshot and mixed-command rollback.
+- Real native/web account check: Sunday selected on iOS appeared in web Settings; native week starts Sunday and both month calendars rotate weekday labels; web All occurrences appeared in native month view. An API-disconnected grouping edit survived process restart, synchronized after reconnect with zero pending, and reached the web client; web reload retained both settings. See the QA log for scope and limitations.
+- Remaining: reminder settings UI/delivery worker, history coverage, indexed local storage and recovery, account deletion/device management, full web/native acceptance and production release gates. Calendar preferences are complete in code; the broader stages remain in progress.

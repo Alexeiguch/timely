@@ -123,3 +123,9 @@ Compared the current working tree (including uncommitted mobile work) with all t
 5. Resolve external provider/device gates alongside independent work, and complete stage 09 operational/release evidence last.
 
 Calendar integrations, widgets, collaboration, payments, SMS and AI task generation are outside the agreed first release; they are not missing implementation steps.
+
+## Update — 2026-09-30, calendar preference milestone
+
+The previous missing **first weekday / month grouping** items are now implemented across server, shared sync, web and native. Owner-scoped preference records participate in the ordinary offline command queue, ordered feed and fixed bootstrap snapshots. Six real Neon transaction checks passed. Native-to-web and web-to-native setting changes were verified through the actual signed-in UIs. See ADR 006 and the latest progress/QA entries for precise scope.
+
+The prior signed-iOS runtime and web regression retest blockers were resolved in the mobile design milestone (documented in `mobile-verification.md`). Reminder settings UI and delivery, account lifecycle, historical coverage, indexed storage/recovery and the remaining physical-device/release acceptance gates are still open. The current step after calendar preferences is the remaining stage 03 history/account/device contract, alongside stage 04 durable-store migration/recovery design. Do not interpret this update as completion of stages 03–09.

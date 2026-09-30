@@ -30,10 +30,19 @@ import {
   SyncEngine,
   SyncError,
   visibleRecords,
+  visiblePreferences,
+  savePreferences,
   type LocalState,
   type SyncStatus,
 } from "@timely/sync";
-import type { Command, Occurrence, Task, TaskRecord } from "@timely/contracts";
+import type {
+  Command,
+  Occurrence,
+  Task,
+  TaskRecord,
+  Preferences,
+  PreferencePatch,
+} from "@timely/contracts";
 import { authClient, authenticatedFetch } from "./auth";
 import { useAccount } from "./account";
 import { localStore } from "./local-store";
@@ -59,6 +68,8 @@ type Planner = {
   setSelected: (day: string) => void;
   mode: PlannerMode;
   setMode: (mode: PlannerMode) => void;
+  preferences: Preferences;
+  setPreferences: (patch: PreferencePatch) => Promise<void>;
   grouped: boolean;
   setGrouped: (value: boolean) => void;
   sync: () => Promise<void>;
@@ -92,7 +103,7 @@ export function PlannerProvider({
   const [now, setNow] = useState(Date.now());
   const [selected, setSelected] = useState(() => today(zone));
   const [mode, setMode] = useState<PlannerMode>("Day");
-  const [grouped, setGrouped] = useState(true);
+  const preferences = useMemo(() => visiblePreferences(state), [state]);
   const [editor, setEditor] = useState<{
     task: Task;
     item?: Occurrence;
@@ -250,8 +261,19 @@ export function PlannerProvider({
     setSelected,
     mode,
     setMode,
-    grouped,
-    setGrouped,
+    preferences,
+    setPreferences: async (patch) => {
+      await savePreferences(store, patch, Crypto.randomUUID);
+      setSyncStatus("Saved locally");
+      void runSync();
+    },
+    grouped: preferences.grouped,
+    setGrouped: (grouped) =>
+      act(async () => {
+        await savePreferences(store, { grouped }, Crypto.randomUUID);
+        setSyncStatus("Saved locally");
+        void runSync();
+      }),
     sync: runSync,
     reload,
     add: (day = selected) =>

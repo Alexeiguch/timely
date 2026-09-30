@@ -1,9 +1,12 @@
+import {
+  preferenceOperationSchema,
+  preferenceRecordSchema,
+} from "./preferences";
 import { z } from "zod";
 import {
   civilDate,
   contentSchema,
   id,
-  preferencesSchema,
   reminderPolicySchema,
   ruleSchema,
   scheduleSchema,
@@ -117,11 +120,18 @@ export const recordSchema = z
   .object({ id, operations: z.array(operationSchema).min(1) })
   .strict();
 export type TaskRecord = z.infer<typeof recordSchema>;
+export const syncOperationSchema = z.union([
+  operationSchema,
+  preferenceOperationSchema,
+]);
+export const syncRecordSchema = z.union([recordSchema, preferenceRecordSchema]);
+export type SyncOperation = z.infer<typeof syncOperationSchema>;
+export type SyncRecord = z.infer<typeof syncRecordSchema>;
 export const pushSchema = z
   .object({
     protocolVersion: z.literal(1),
     deviceId: id,
-    operations: z.array(operationSchema).min(1).max(100),
+    operations: z.array(syncOperationSchema).min(1).max(100),
   })
   .strict()
   .refine(
@@ -131,7 +141,7 @@ export const pushSchema = z
 export const changeSchema = z
   .object({
     cursor: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-    record: recordSchema,
+    record: syncRecordSchema,
   })
   .strict();
 export const outcomeSchema = z
@@ -139,7 +149,7 @@ export const outcomeSchema = z
     id,
     disposition: z.enum(["applied", "superseded"]),
     stamp: stampSchema,
-    record: recordSchema,
+    record: syncRecordSchema,
     cursor: z.number().int().nonnegative(),
   })
   .strict();
@@ -168,7 +178,7 @@ export const bootstrapSchema = z
 export const bootstrapResponseSchema = z
   .object({
     token: id,
-    records: z.array(recordSchema),
+    records: z.array(syncRecordSchema),
     watermark: z.number().int().nonnegative(),
     next: z.number().int().nonnegative().nullable(),
     serverTime: z.number(),
@@ -184,8 +194,5 @@ export const deviceSchema = z
   .strict();
 export const windowSchema = z
   .object({ from: civilDate, through: civilDate })
-  .strict();
-export const preferencesCommandSchema = z
-  .object({ preferences: preferencesSchema, stamp: stampSchema })
   .strict();
 export type Outcome = z.infer<typeof outcomeSchema>;

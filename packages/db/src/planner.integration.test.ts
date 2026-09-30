@@ -4,8 +4,21 @@ import { eq } from "drizzle-orm";
 import { createDatabase } from "./index";
 import { planner } from "./planner";
 import { user, jobOutbox, syncOperations } from "./schema";
-import { type Command, type Operation, taskSchema } from "@timely/contracts";
-import { occurrenceTarget, reduceRecord } from "@timely/sync";
+import {
+  type Command,
+  type Operation,
+  type SyncOperation,
+  type PreferencePatch,
+  preferenceOperationSchema,
+  preferenceRecordSchema,
+  recordSchema,
+  taskSchema,
+} from "@timely/contracts";
+import {
+  occurrenceTarget,
+  reduceRecord,
+  reducePreferences,
+} from "@timely/sync";
 import { projectSeries } from "@timely/domain";
 const enabled = process.env.RUN_DB_TESTS === "1";
 describe.skipIf(!enabled)(
@@ -47,7 +60,7 @@ describe.skipIf(!enabled)(
       });
       return op(task.id, { type: "create", task });
     };
-    const push = (ownerId: string, operations: Operation[]) =>
+    const push = (ownerId: string, operations: SyncOperation[]) =>
       api!.push(ownerId, { protocolVersion: 1, deviceId, operations });
     beforeAll(async () => {
       for (const id of owners) {
@@ -125,7 +138,7 @@ describe.skipIf(!enabled)(
       const command = create();
       const response = await push(owners[0]!, [command]);
       const item = projectSeries(
-        reduceRecord(response.results[0]!.record),
+        reduceRecord(recordSchema.parse(response.results[0]!.record)),
         "2026-09-29",
         "2026-09-29",
       )[0]!;
@@ -158,7 +171,7 @@ describe.skipIf(!enabled)(
       };
       const created = await push(owners[0]!, [createCommand]);
       const item = projectSeries(
-        reduceRecord(created.results[0]!.record),
+        reduceRecord(recordSchema.parse(created.results[0]!.record)),
         "2026-09-30",
         "2026-09-30",
       )[0]!;
@@ -171,7 +184,7 @@ describe.skipIf(!enabled)(
       const removed = await push(owners[0]!, [remove]);
       expect(
         projectSeries(
-          reduceRecord(removed.results[0]!.record),
+          reduceRecord(recordSchema.parse(removed.results[0]!.record)),
           "2026-09-30",
           "2026-10-02",
         ),
@@ -184,7 +197,7 @@ describe.skipIf(!enabled)(
       const restored = await push(owners[0]!, [restore]);
       expect(
         projectSeries(
-          reduceRecord(restored.results[0]!.record),
+          reduceRecord(recordSchema.parse(restored.results[0]!.record)),
           "2026-09-30",
           "2026-10-02",
         ),
@@ -230,6 +243,77 @@ describe.skipIf(!enabled)(
       const second = await api!.pull(owners[0]!, first.cursor, 1);
       expect(second.more).toBe(false);
       expect(second.cursor).toBe(first.cursor + 1);
+    });
+    it("synchronizes independent preference groups, deduplicates and isolates accounts", async () => {
+      const make = (patch: PreferencePatch, physical: number) => {
+        const id = randomUUID();
+        return preferenceOperationSchema.parse({
+          protocolVersion: 1,
+          id,
+          deviceId,
+          definitionId: "preferences",
+          stamp: { physical, logical: 0, deviceId, operationId: id },
+          createdAt: new Date().toISOString(),
+          command: { type: "preferences", patch },
+        });
+      };
+      const now = Date.now();
+      const first = make({ firstWeekday: 7 }, now);
+      const saved = await push(owners[0]!, [first]);
+      expect((await push(owners[0]!, [first])).results).toEqual(saved.results);
+      const snapshot = await api!.bootstrap(owners[0]!, { limit: 1 });
+      if ("expired" in snapshot) throw new Error("Unexpected expiration");
+      const changed = await push(owners[0]!, [
+        make({ grouped: false }, now - 1000),
+        make({ firstWeekday: 1 }, now - 2000),
+      ]);
+      expect(changed.results[1]!.disposition).toBe("superseded");
+      expect(
+        reducePreferences(
+          preferenceRecordSchema.parse(changed.results[1]!.record),
+        ),
+      ).toMatchObject({ firstWeekday: 7, grouped: false });
+      let page = snapshot;
+      const records = [...page.records];
+      while (page.next !== null) {
+        const next = await api!.bootstrap(owners[0]!, {
+          token: snapshot.token,
+          after: page.next,
+          limit: 1,
+        });
+        if ("expired" in next) throw new Error("Unexpected expiration");
+        page = next;
+        records.push(...page.records);
+      }
+      expect(
+        reducePreferences(
+          preferenceRecordSchema.parse(
+            records.find((r) => r.id === "preferences"),
+          ),
+        ),
+      ).toMatchObject({ firstWeekday: 7, grouped: true });
+      const isolated = await api!.bootstrap(owners[1]!, {});
+      if ("expired" in isolated) throw new Error("Unexpected expiration");
+      expect(
+        isolated.records.find((r) => r.id === "preferences"),
+      ).toBeUndefined();
+      const change = make({ firstWeekday: 2 }, now + 100);
+      const missing = op(randomUUID(), {
+        type: "order",
+        target: {
+          id: randomUUID(),
+          revisionId: randomUUID(),
+          slot: "0",
+          originalDate: "2026-09-29",
+        },
+        order: "a",
+      });
+      await expect(push(owners[0]!, [change, missing])).rejects.toThrow(
+        "unavailable",
+      );
+      expect((await api!.pull(owners[0]!, changed.watermark)).changes).toEqual(
+        [],
+      );
     });
   },
 );

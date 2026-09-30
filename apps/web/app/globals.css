@@ -662,6 +662,12 @@ a {
   accent-color: var(--primary);
   height: 16px;
 }
+.settings-card > label {
+  margin-top: 16px;
+}
+.settings-card > h2:not(:first-child) {
+  margin-top: 32px;
+}
 .settings-card dl {
   display: grid;
   gap: 8px;

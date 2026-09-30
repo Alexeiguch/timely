@@ -42,3 +42,9 @@ EXPO_PUBLIC_API_URL=http://localhost:3001 xcodebuild \
 Authenticated simulator flows now exercised: task creation, daily recurrence, future title edit, completion/Undo, Day/Week/Month, Review/Search/Settings, local sign-out and real email reauthentication. With the local backend stopped, a new task survived process termination/relaunch; completion added another durable operation. Restarting the backend and selecting Sync now returned to Synced/zero pending. After sign-out purged the local account, reauthentication downloaded all three plans and the completion, confirming server persistence. This was backend disconnection, not physical-device airplane mode.
 
 The checked-in Maestro flow remains unexecuted; the above evidence comes from actual native UI interaction. Remaining gates include Android runtime, physical devices, complete gesture/large-text/keyboard/landscape checks and provider/push verification.
+
+### 2026-09-30 — Rounded dock and durable calendar settings
+
+Final signed simulator build log: `/tmp/timely-tabbar-final-build.log`. All four tab destinations work, using the standard navigator with a rounded inset bar and compact active icon pill. Evidence: `evidence/mobile-tabbar-ios.png`.
+
+Sunday-first weeks and month grouping now synchronize with the web client. Verified real account bootstrap, changes in both directions, an API-disconnected grouping edit, process restart with the queued edit intact, and automatic reconnect to zero pending. Existing weekly recurrence rules are untouched. This does not close the remaining Android, large-text, gesture or physical-device gates.

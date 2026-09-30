@@ -59,10 +59,27 @@ export function Settings() {
           <Text style={s.body}>{p.zone.replaceAll("_", " ")}</Text>
           <Text style={s.muted}>
             Time zone follows this device and refreshes when you return to the
-            app. A 09:00 plan stays at 09:00 local time. Weeks start on Monday.
+            app. A 09:00 plan stays at 09:00 local time. Calendar choices sync
+            across your devices.
           </Text>
           <Choices
-            label="Month view for this session"
+            label="First day of the week"
+            value={String(p.preferences.firstWeekday)}
+            options={[
+              "Monday",
+              "Tuesday",
+              "Wednesday",
+              "Thursday",
+              "Friday",
+              "Saturday",
+              "Sunday",
+            ].map((label, index) => ({ value: String(index + 1), label }))}
+            onChange={(value) =>
+              p.act(() => p.setPreferences({ firstWeekday: Number(value) }))
+            }
+          />
+          <Choices
+            label="Month view"
             value={p.grouped ? "grouped" : "all"}
             options={[
               { value: "grouped", label: "Grouped" },
@@ -89,9 +106,7 @@ export function Settings() {
             }}
           />
         </View>
-        <Text style={s.muted}>
-          Account preferences and account deletion are not available yet.
-        </Text>
+        <Text style={s.muted}>Account deletion is not available yet.</Text>
       </ScrollView>
     </SafeAreaView>
   );

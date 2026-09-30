@@ -1,16 +1,26 @@
 import {
   bootstrapResponseSchema,
   operationSchema,
+  preferenceOperationSchema,
+  type PreferencePatch,
+  type SyncOperation,
+  type SyncRecord,
   pullResponseSchema,
   pushResponseSchema,
   type Command,
   type Operation,
   type TaskRecord,
 } from "@timely/contracts";
+import {
+  appendSyncOperation,
+  isTaskRecord,
+  isPreferenceRecord,
+  reducePreferences,
+} from "./preferences";
 import { appendOperation } from "./records";
 import { calibrate, observe, retryDelay, tick, type ClockState } from "./index";
 export type Pending = {
-  operation: Operation;
+  operation: SyncOperation;
   attempts: number;
   retryAt: number;
   error?: string;
@@ -20,7 +30,7 @@ export type LocalState = {
   ownerId: string;
   deviceId: string;
   clock: ClockState;
-  shadows: Record<string, TaskRecord>;
+  shadows: Record<string, SyncRecord>;
   outbox: Pending[];
   cursor: number;
   bootstrapped: boolean;
@@ -29,7 +39,7 @@ export type LocalState = {
     token: string;
     watermark: number;
     after: number;
-    records: Record<string, TaskRecord>;
+    records: Record<string, SyncRecord>;
   } | null;
 };
 export function initialState(ownerId: string, deviceId: string): LocalState {
@@ -50,15 +60,12 @@ export interface LocalStore {
   read(): Promise<LocalState>;
   transaction<T>(change: (state: LocalState) => T): Promise<T>;
 }
-export function visibleRecords(state: LocalState): {
-  records: TaskRecord[];
-  errors: string[];
-} {
+function visibleState(state: LocalState) {
   const records = { ...state.shadows },
     errors: string[] = [];
   for (const pending of state.outbox) {
     try {
-      records[pending.operation.definitionId] = appendOperation(
+      records[pending.operation.definitionId] = appendSyncOperation(
         records[pending.operation.definitionId],
         pending.operation,
       );
@@ -67,6 +74,44 @@ export function visibleRecords(state: LocalState): {
     }
   }
   return { records: Object.values(records), errors };
+}
+export function visibleRecords(state: LocalState): {
+  records: TaskRecord[];
+  errors: string[];
+} {
+  const visible = visibleState(state);
+  return {
+    records: visible.records.filter(isTaskRecord),
+    errors: visible.errors,
+  };
+}
+export function visiblePreferences(state: LocalState | null) {
+  return reducePreferences(
+    state ? visibleState(state).records.find(isPreferenceRecord) : undefined,
+  );
+}
+export async function savePreferences(
+  store: LocalStore,
+  patch: PreferencePatch,
+  uuid: () => string,
+  now = Date.now(),
+) {
+  return store.transaction((state) => {
+    const id = uuid();
+    const advanced = tick(state.clock, now, state.deviceId, id);
+    const operation = preferenceOperationSchema.parse({
+      protocolVersion: 1,
+      id,
+      deviceId: state.deviceId,
+      definitionId: "preferences",
+      command: { type: "preferences", patch },
+      stamp: advanced.stamp,
+      createdAt: new Date(now).toISOString(),
+    });
+    state.clock = advanced.clock;
+    state.outbox.push({ operation, attempts: 0, retryAt: 0 });
+    return operation;
+  });
 }
 export async function saveLocal(
   store: LocalStore,
@@ -154,7 +199,11 @@ export function httpTransport(
   };
 }
 export type SyncStatus =
-  "Saved locally" | "Syncing" | "Synced" | "Offline" | "Needs attention";
+  | "Saved locally"
+  | "Syncing"
+  | "Synced"
+  | "Offline"
+  | "Needs attention";
 export class SyncEngine {
   private running: Promise<void> | null = null;
   constructor(

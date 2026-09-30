@@ -5,11 +5,16 @@ import {
   deviceSchema,
   pushSchema,
   recordSchema,
+  syncRecordSchema,
+  preferenceRecordSchema,
   type Outcome,
   type TaskRecord,
 } from "@timely/contracts";
 import {
   appendOperation,
+  appendSyncOperation,
+  isPreferenceOperation,
+  preferencesSuperseded,
   canonicalStamp,
   CommandError,
   reduceRecord,
@@ -99,6 +104,57 @@ export function planner(db: DB = database()) {
                 "An operation ID cannot be reused for different content.",
               );
             results.push(prior.result);
+            continue;
+          }
+          if (isPreferenceOperation(authored)) {
+            const [row] = await tx
+              .select()
+              .from(t.userPreferences)
+              .where(eq(t.userPreferences.ownerId, ownerId));
+            const canonical = {
+              ...authored,
+              stamp: canonicalStamp(authored.stamp, Date.now()),
+            };
+            const record = preferenceRecordSchema.parse(
+              appendSyncOperation(row?.record, canonical),
+            );
+            await tx
+              .insert(t.userPreferences)
+              .values({ ownerId, record })
+              .onConflictDoUpdate({
+                target: t.userPreferences.ownerId,
+                set: { record, updatedAt: new Date() },
+              });
+            cursor++;
+            const result: Outcome = {
+              id: authored.id,
+              disposition: preferencesSuperseded(record, canonical)
+                ? "superseded"
+                : "applied",
+              stamp: canonical.stamp,
+              record,
+              cursor,
+            };
+            await tx
+              .insert(t.syncOperations)
+              .values({
+                ownerId,
+                id: authored.id,
+                deviceId: authored.deviceId,
+                fingerprint: digest,
+                command: canonical,
+                result,
+              });
+            await tx.insert(t.syncChanges).values({ ownerId, cursor, record });
+            if (canonical.command.patch.reminders)
+              await tx
+                .insert(t.jobOutbox)
+                .values({
+                  ownerId,
+                  operationId: authored.id,
+                  type: "reconcile-preferences",
+                });
+            results.push(result);
             continue;
           }
           const [row] = await tx
@@ -242,7 +298,7 @@ export function planner(db: DB = database()) {
         .limit(limit + 1);
       const changes = rows.slice(0, limit).map((row) => ({
         cursor: row.cursor,
-        record: recordSchema.parse(row.record),
+        record: syncRecordSchema.parse(row.record),
       }));
       return {
         changes,
@@ -296,7 +352,7 @@ export function planner(db: DB = database()) {
           });
           // Owner lock makes this fixed snapshot agree with the feed watermark. No transaction survives this request.
           await tx.execute(
-            sql`insert into timely.snapshot_items (owner_id, token, position, record) select owner_id, ${token}::uuid, row_number() over (order by id)::integer, record from timely.task_definitions where owner_id = ${ownerId}`,
+            sql`insert into timely.snapshot_items (owner_id, token, position, record) select owner_id, ${token}::uuid, row_number() over (order by id)::integer, record from (select owner_id, id::text, record from timely.task_definitions where owner_id = ${ownerId} union all select owner_id, 'preferences' as id, record from timely.user_preferences where owner_id = ${ownerId}) as snapshot`,
           );
         });
       }
@@ -327,7 +383,7 @@ export function planner(db: DB = database()) {
         token,
         records: rows
           .slice(0, request.limit)
-          .map((r) => recordSchema.parse(r.record)),
+          .map((r) => syncRecordSchema.parse(r.record)),
         watermark: snapshot.watermark,
         next:
           rows.length > request.limit

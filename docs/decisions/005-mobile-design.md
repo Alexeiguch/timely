@@ -17,3 +17,5 @@ A root route error boundary provides a retry screen for unexpected rendering fai
 ## Scope of evidence
 
 iPhone 17 Pro simulator, iOS 26.2, embedded Release bundle: real local SMTP OTP, authenticated planner, creation, daily recurrence, occurrence/future edit scopes, completion/Undo, all four destinations, search, backend-disconnected create/restart/complete/reconnect, sign-out and reauthentication/bootstrap. This is not physical-device airplane-mode, native provider OAuth, push, or Android runtime evidence. See QA evidence for exact results.
+
+The follow-up bottom navigation keeps the standard Expo tab navigator, with an inset rounded white dock, small blue active-icon pill, persistent labels, safe-area spacing and a warm background. Bar height allows extra room as system font scale increases. No custom navigation-event implementation or decorative animation was introduced. Verified all four destinations in the signed iOS simulator; large-text/Android acceptance remains separate.
