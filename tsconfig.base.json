@@ -12,6 +12,8 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    // TypeScript 6 loads @types packages only when they are named here.
+    "types": ["*"]
   }
 }
