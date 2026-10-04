@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
+  Animated,
   View,
   Text,
   TextInput,
@@ -14,8 +16,63 @@ import { colors, surfaces } from "@timely/design";
 import { Brand } from "./brand";
 import { ProviderLogo } from "./provider-logo";
 import { Button } from "./ui";
-import { authClient, apiURL, signInApple, signInGoogle } from "./auth";
+function Digit({ char }: { char: string }) {
+  const motion = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    let cancel = false;
+    void AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
+      if (cancel) return;
+      if (reduce) {
+        motion.setValue(1);
+        return;
+      }
+      motion.setValue(0);
+      Animated.timing(motion, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }).start();
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [char, motion]);
+  return (
+    <Animated.Text
+      style={{
+        opacity: motion,
+        transform: [
+          {
+            translateY: motion.interpolate({
+              inputRange: [0, 1],
+              outputRange: [8, 0],
+            }),
+          },
+          {
+            scale: motion.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.6, 1],
+            }),
+          },
+        ],
+        fontFamily: "Baloo2",
+        fontSize: 28,
+        color: colors.text,
+      }}
+    >
+      {char}
+    </Animated.Text>
+  );
+}
+import {
+  authClient,
+  apiURL,
+  isGoogleSignInAvailable,
+  signInApple,
+  signInGoogle,
+} from "./auth";
 export function SignIn() {
+  const googleSignInAvailable = isGoogleSignInAvailable();
   const [providers, setProviders] = useState({ google: false, apple: false });
   const [providerState, setProviderState] = useState("loading");
   const [providerAttempt, setProviderAttempt] = useState(0);
@@ -35,6 +92,7 @@ export function SignIn() {
         setProviders({
           google:
             value.google &&
+            googleSignInAvailable &&
             !!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID &&
             (Platform.OS !== "ios" ||
               !!process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID),
@@ -48,9 +106,10 @@ export function SignIn() {
       clearTimeout(timeout);
       controller.abort();
     };
-  }, [providerAttempt]);
+  }, [googleSignInAvailable, providerAttempt]);
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
+  const [shown, setShown] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -60,6 +119,24 @@ export function SignIn() {
     const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
     return () => clearTimeout(timer);
   }, [cooldown]);
+  useEffect(() => {
+    if (otp === shown) return;
+    let cancel = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    void AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
+      if (cancel) return;
+      const jump = otp.length - shown.length;
+      if (reduce || jump <= 1 || !otp.startsWith(shown)) {
+        setShown(otp);
+        return;
+      }
+      timer = setTimeout(() => setShown(otp.slice(0, shown.length + 1)), 90);
+    });
+    return () => {
+      cancel = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [otp, shown]);
   async function run(action: () => Promise<void>) {
     setBusy(true);
     setMessage("");
@@ -78,7 +155,7 @@ export function SignIn() {
       setBusy(false);
     }
   }
-  async function send() {
+  async function send(resend = false) {
     const result = await authClient.emailOtp.sendVerificationOtp({
       email,
       type: "sign-in",
@@ -86,7 +163,8 @@ export function SignIn() {
     if (result.error) throw new Error(result.error.message);
     setSent(true);
     setCooldown(60);
-    setMessage("Your code expires in 5 minutes.");
+    setOtp("");
+    setMessage(resend ? "A new code is on its way." : "");
   }
   const action = (label: string, fn: () => Promise<void>, disabled = false) => (
     <Pressable
@@ -109,6 +187,87 @@ export function SignIn() {
           contentContainerStyle={s.content}
           keyboardShouldPersistTaps="handled"
         >
+          {sent ? (
+            <>
+              <Brand />
+              <View style={s.intro}>
+                <Text style={s.title}>Enter your code.</Text>
+                <Text style={s.body}>
+                  We sent six digits to {email}. They expire in 5 minutes.
+                </Text>
+              </View>
+              <View style={s.card}>
+                <Text style={s.heading}>One code, then you’re in</Text>
+                <Text style={s.body}>
+                  We sent six digits to {email}. They expire in 5 minutes.
+                  Type them here, or accept the code suggested from your email.
+                </Text>
+                <Text style={s.label}>Six-digit code</Text>
+                <View style={s.otpField}>
+                  <View style={s.otpRow}>
+                    {Array.from({ length: 6 }, (_, index) => {
+                      const char = shown[index] ?? "";
+                      const active = index === Math.min(otp.length, 5);
+                      return (
+                        <View
+                          key={index}
+                          style={[
+                            s.otpCell,
+                            char ? s.otpFilled : null,
+                            active ? s.otpActive : null,
+                          ]}
+                        >
+                          {char ? (
+                            <Digit key={`${index}-${char}`} char={char} />
+                          ) : null}
+                        </View>
+                      );
+                    })}
+                  </View>
+                  <TextInput
+                    accessibilityLabel="Six-digit code"
+                    value={otp}
+                    onChangeText={(value) =>
+                      setOtp(value.replace(/\D/g, "").slice(0, 6))
+                    }
+                    maxLength={6}
+                    keyboardType="number-pad"
+                    autoComplete="one-time-code"
+                    textContentType="oneTimeCode"
+                    importantForAutofill="yes"
+                    autoFocus
+                    style={s.otpCapture}
+                  />
+                </View>
+                <Text style={s.caption}>One number in each box.</Text>
+                {action(
+                  "Sign in",
+                  async () => {
+                    const result = await authClient.signIn.emailOtp({
+                      email,
+                      otp,
+                    });
+                    if (result.error) throw new Error(result.error.message);
+                  },
+                  otp.length !== 6,
+                )}
+                {action(
+                  cooldown ? `Resend in ${cooldown}s` : "Resend code",
+                  () => send(true),
+                  cooldown > 0,
+                )}
+                {action("Change email", async () => {
+                  setSent(false);
+                  setOtp("");
+                  setMessage("");
+                })}
+                <Text accessibilityLiveRegion="polite" style={s.caption}>
+                  {busy ? "Just a moment…" : message}
+                </Text>
+              </View>
+            </>
+          ) : (
+            <>
           <Brand />
           <View style={s.intro}>
             <Text style={s.title}>Make room for what matters.</Text>
@@ -141,6 +300,8 @@ export function SignIn() {
                   ? "Checking sign-in options…"
                   : providerState === "error"
                     ? "Social sign-in is unavailable right now. You can use email."
+                    : !googleSignInAvailable
+                      ? "Google sign-in requires a fresh Timely development build and is not available in Expo Go. Email is ready to use."
                     : "Some sign-in options aren’t available on this build. Email is ready to use."}
               </Text>
             )}
@@ -161,55 +322,19 @@ export function SignIn() {
               accessibilityLabel="Email address"
               value={email}
               onChangeText={setEmail}
-              editable={!sent}
               autoCapitalize="none"
               keyboardType="email-address"
               autoComplete="email"
+              textContentType="emailAddress"
               style={s.input}
             />
-            {sent && (
-              <>
-                <Text style={s.label}>Six-digit code</Text>
-                <TextInput
-                  accessibilityLabel="Six-digit code"
-                  value={otp}
-                  onChangeText={setOtp}
-                  maxLength={6}
-                  keyboardType="number-pad"
-                  autoComplete="one-time-code"
-                  style={s.input}
-                />
-              </>
-            )}
-            {action(
-              sent ? "Sign in" : "Send me a code",
-              sent
-                ? async () => {
-                    const result = await authClient.signIn.emailOtp({
-                      email,
-                      otp,
-                    });
-                    if (result.error) throw new Error(result.error.message);
-                  }
-                : send,
-            )}
-            {sent && (
-              <>
-                {action(
-                  cooldown ? `Resend in ${cooldown}s` : "Resend code",
-                  send,
-                  cooldown > 0,
-                )}
-                {action("Change email", async () => {
-                  setSent(false);
-                  setOtp("");
-                })}
-              </>
-            )}
+            {action("Send me a code", () => send())}
             <Text accessibilityLiveRegion="polite" style={s.caption}>
               {busy ? "Just a moment…" : message}
             </Text>
           </View>
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -258,6 +383,29 @@ const s = StyleSheet.create({
     fontFamily: "NunitoSans",
     fontSize: 16,
     color: colors.text,
+  },
+  otpField: { position: "relative" },
+  otpRow: { flexDirection: "row", gap: 8 },
+  otpCell: {
+    flex: 1,
+    height: 56,
+    borderWidth: 1,
+    borderColor: colors.muted,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+  },
+  otpFilled: { borderColor: colors.primary, backgroundColor: "#f3f7ff" },
+  otpActive: { borderColor: colors.primary },
+  otpCapture: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    color: "transparent",
+    fontSize: 16,
   },
   button: {
     minHeight: 48,

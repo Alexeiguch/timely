@@ -15,17 +15,19 @@
     "db:generate": "pnpm --filter @timely/db generate",
     "db:migrate": "pnpm --filter @timely/db migrate",
     "test:e2e": "playwright test",
-    "test:auth": "node scripts/auth-smoke.mjs"
+    "test:auth": "node scripts/auth-smoke.mjs",
+    "doctor:mobile": "pnpm --filter @timely/mobile run doctor",
+    "fix:expo-vscode-debugger": "node scripts/patch-expo-vscode-debugger.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.58.2",
     "@types/node": "24.10.1",
-    "@types/react": "19.2.2",
-    "@types/react-dom": "19.2.2",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
     "auth": "1.7.6",
     "tsx": "4.21.0",
     "turbo": "2.11.5",
-    "typescript": "5.9.3",
+    "typescript": "6.0.3",
     "vitest": "4.0.18"
   },
   "dependencies": {
@@ -34,8 +36,17 @@
   },
   "type": "module",
   "pnpm": {
+    "patchedDependencies": {
+      "@react-native/dev-middleware@0.86.3": "patches/@react-native__dev-middleware@0.86.3.patch",
+      "expo-modules-core@57.0.20": "patches/expo-modules-core@57.0.20.patch",
+      "expo-modules-jsi@57.1.1": "patches/expo-modules-jsi@57.1.1.patch"
+    },
     "overrides": {
-      "@better-auth/utils": "0.4.2"
+      "@better-auth/utils": "0.4.2",
+      "expo": "57.0.26",
+      "@expo/metro-runtime": "57.0.16",
+      "@expo/dom-webview": "57.0.1",
+      "@expo/log-box": "57.0.4"
     }
   }
 }

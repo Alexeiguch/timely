@@ -55,6 +55,7 @@ export function NativePlanner() {
   const [weekDayOnly, setWeekDayOnly] = useState(false);
   const [focused, setFocused] = useState<Occurrence | null>(null);
   const [linkMessage, setLinkMessage] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
   const params = useLocalSearchParams<{
     day?: string;
     occurrenceId?: string;
@@ -271,8 +272,11 @@ export function NativePlanner() {
         stickySectionHeadersEnabled={false}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
-        refreshing={p.syncStatus === "Syncing"}
-        onRefresh={() => void p.sync()}
+        refreshing={refreshing}
+        onRefresh={() => {
+          setRefreshing(true);
+          void p.sync().finally(() => setRefreshing(false));
+        }}
         ListHeaderComponent={
           <View style={styles.header}>
             <View style={s.row}>

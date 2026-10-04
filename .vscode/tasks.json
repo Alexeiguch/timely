@@ -4,12 +4,13 @@
     {
       "label": "Mobile: Start Metro",
       "type": "shell",
-      "command": "pnpm",
+      "command": "node",
       "args": [
-        "exec",
-        "expo",
+        "--dns-result-order=ipv4first",
+        "node_modules/expo/bin/cli",
         "start",
         "--dev-client",
+        "--clear",
         "--localhost",
         "--port",
         "8081"
@@ -19,7 +20,7 @@
         "env": {
           "EXPO_PUBLIC_API_URL": "http://localhost:3001",
           "APP_VARIANT": "development",
-          "REACT_NATIVE_PACKAGER_HOSTNAME": "localhost"
+          "REACT_NATIVE_PACKAGER_HOSTNAME": "127.0.0.1"
         }
       },
       "isBackground": true,
@@ -44,6 +45,18 @@
       "runOptions": {
         "instanceLimit": 1
       }
+    },
+    {
+      "label": "Mobile: Repair Expo Tools 1.6.3 debugger",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "scripts/patch-expo-vscode-debugger.mjs"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
     },
     {
       "label": "Mobile: Build iOS development app",

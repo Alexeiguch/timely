@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { authClient } from "@timely/auth/client";
 import { useAuthProviders } from "../lib/use-auth-providers";
 export function SignIn() {
@@ -40,15 +40,41 @@ export function SignIn() {
   }
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
+  const [shown, setShown] = useState("");
   const [sent, setSent] = useState(false);
+  const [direction, setDirection] = useState<"forward" | "back" | "none">(
+    "none",
+  );
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [cooldown, setCooldown] = useState(0);
+  const [codeFocus, setCodeFocus] = useState(false);
+  const codeRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!cooldown) return;
     const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
     return () => clearTimeout(timer);
   }, [cooldown]);
+  useEffect(() => {
+    if (!sent) return;
+    codeRef.current?.focus();
+  }, [sent]);
+  useEffect(() => {
+    if (otp === shown) return;
+    const reduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const jump = otp.length - shown.length;
+    if (reduce || jump <= 1 || !otp.startsWith(shown)) {
+      setShown(otp);
+      return;
+    }
+    const timer = window.setTimeout(
+      () => setShown(otp.slice(0, shown.length + 1)),
+      90,
+    );
+    return () => window.clearTimeout(timer);
+  }, [otp, shown]);
   async function run(action: () => Promise<void>) {
     setBusy(true);
     setMessage("");
@@ -64,34 +90,144 @@ export function SignIn() {
       setBusy(false);
     }
   }
-  async function send() {
+  async function send(resend = false) {
     const { error } = await authClient.emailOtp.sendVerificationOtp({
       email,
       type: "sign-in",
     });
     if (error) throw new Error(error.message);
+    setDirection("forward");
     setSent(true);
     setCooldown(60);
-    setMessage("Check your inbox. Your code expires in 5 minutes.");
+    setOtp("");
+    setMessage(resend ? "A new code is on its way." : "");
   }
   return (
     <main className="signin">
       <div className="brand">
         timely<span>✳</span>
       </div>
-      <section className="welcome">
-        <span className="eyebrow">MAKE ROOM FOR YOUR DAY</span>
-        <h1>
-          A little space for
-          <br />
-          what matters.
-        </h1>
-        <p>Your plans, at your pace. Pick up where you left off.</p>
-        <div className="doodle" aria-hidden="true">
-          ✳
-        </div>
-      </section>
-      <section className="signin-card">
+      <div
+        className={`signin-step${direction === "none" ? "" : direction === "forward" ? " is-forward" : " is-back"}`}
+        key={sent ? "code" : "email"}
+      >
+        {sent ? (
+          <>
+            <section className="welcome">
+              <span className="eyebrow">CHECK YOUR INBOX</span>
+              <h1>Enter your code.</h1>
+              <p>We sent six digits to {email}. They expire in 5 minutes.</p>
+              <div className="doodle" aria-hidden="true">
+                ✳
+              </div>
+            </section>
+            <section className="signin-card">
+              <h2>One code, then you’re in</h2>
+              <p>
+                We sent six digits to {email}. They expire in 5 minutes. Type
+                them here, or accept the code suggested from your email.
+              </p>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void run(async () => {
+                    const { error } = await authClient.signIn.emailOtp({
+                      email,
+                      otp,
+                    });
+                    if (error) throw new Error(error.message);
+                  });
+                }}
+              >
+                <label htmlFor="email-code">Six-digit code</label>
+                <div className="otp-field">
+                  <div className="otp-cells" aria-hidden="true">
+                    {Array.from({ length: 6 }, (_, index) => {
+                      const char = shown[index] ?? "";
+                      const active =
+                        codeFocus && index === Math.min(otp.length, 5);
+                      return (
+                        <span
+                          key={index}
+                          className={`otp-cell${char ? " is-filled" : ""}${active ? " is-active" : ""}`}
+                        >
+                          {char ? (
+                            <span
+                              className="otp-char"
+                              key={`${index}-${char}`}
+                            >
+                              {char}
+                            </span>
+                          ) : null}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <input
+                    id="email-code"
+                    ref={codeRef}
+                    className="otp-capture"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    name="one-time-code"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    required
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    value={otp}
+                    aria-describedby="email-code-hint"
+                    onFocus={() => setCodeFocus(true)}
+                    onBlur={() => setCodeFocus(false)}
+                    onChange={(e) =>
+                      setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
+                  />
+                </div>
+                <p id="email-code-hint" className="otp-hint">
+                  One number in each box.
+                </p>
+                <button className="primary" disabled={busy || otp.length !== 6}>
+                  {busy ? "Just a moment…" : "Sign in"}
+                </button>
+              </form>
+              <div className="row">
+                <button
+                  disabled={busy || cooldown > 0}
+                  onClick={() => void run(() => send(true))}
+                >
+                  {cooldown ? `Resend in ${cooldown}s` : "Resend code"}
+                </button>
+                <button
+                  onClick={() => {
+                    setDirection("back");
+                    setSent(false);
+                    setOtp("");
+                    setMessage("");
+                  }}
+                >
+                  Change email
+                </button>
+              </div>
+              <p role="status">{message}</p>
+              <small>No password to remember. Just you and your plans.</small>
+            </section>
+          </>
+        ) : (
+          <>
+            <section className="welcome">
+              <span className="eyebrow">MAKE ROOM FOR YOUR DAY</span>
+              <h1>
+                A little space for
+                <br />
+                what matters.
+              </h1>
+              <p>Your plans, at your pace. Pick up where you left off.</p>
+              <div className="doodle" aria-hidden="true">
+                ✳
+              </div>
+            </section>
+            <section className="signin-card">
         <h2>Welcome to your day</h2>
         <p>Sign in to keep your plans together.</p>
         <button
@@ -137,17 +273,7 @@ export function SignIn() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            void run(
-              sent
-                ? async () => {
-                    const { error } = await authClient.signIn.emailOtp({
-                      email,
-                      otp,
-                    });
-                    if (error) throw new Error(error.message);
-                  }
-                : send,
-            );
+            void run(send);
           }}
         >
           <label>
@@ -157,46 +283,19 @@ export function SignIn() {
               autoComplete="email"
               required
               value={email}
-              disabled={sent}
               onChange={(e) => setEmail(e.target.value)}
             />
           </label>
-          {sent && (
-            <label>
-              Six-digit code
-              <input
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{6}"
-                maxLength={6}
-                required
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-              />
-            </label>
-          )}
           <button className="primary" disabled={busy}>
-            {busy ? "Just a moment…" : sent ? "Sign in" : "Send me a code"}
+            {busy ? "Just a moment…" : "Send me a code"}
           </button>
         </form>
-        {sent && (
-          <div className="row">
-            <button disabled={busy || cooldown > 0} onClick={() => run(send)}>
-              {cooldown ? `Resend in ${cooldown}s` : "Resend code"}
-            </button>
-            <button
-              onClick={() => {
-                setSent(false);
-                setOtp("");
-              }}
-            >
-              Change email
-            </button>
-          </div>
-        )}
         <p role="status">{message}</p>
         <small>No password to remember. Just you and your plans.</small>
-      </section>
+              </section>
+            </>
+          )}
+        </div>
     </main>
   );
 }

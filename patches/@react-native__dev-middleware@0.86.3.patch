@@ -1,0 +1,28 @@
+diff --git a/dist/inspector-proxy/InspectorProxy.js b/dist/inspector-proxy/InspectorProxy.js
+index 69af037..ce39308 100644
+--- a/dist/inspector-proxy/InspectorProxy.js
++++ b/dist/inspector-proxy/InspectorProxy.js
+@@ -364,6 +364,23 @@ class InspectorProxy {
+       perMessageDeflate: false,
+       maxPayload: 0,
+       verifyClient: (info) => {
++        const requestUrl = new URL(
++          info.req.url ?? "",
++          this.#serverBaseUrl,
++        );
++        const remoteAddress = info.req.socket.remoteAddress;
++        const isLoopback =
++          remoteAddress === "::1" ||
++          remoteAddress?.startsWith("127.") === true ||
++          remoteAddress?.startsWith("::ffff:127.") === true;
++        const isExpoVsCodeDebugger =
++          requestUrl.searchParams.get("type") === "vscode" &&
++          requestUrl.searchParams
++            .get("userAgent")
++            ?.startsWith("vscode/") === true;
++        if (info.origin == null && isLoopback && isExpoVsCodeDebugger) {
++          return true;
++        }
+         if (this.#serverBaseUrl.origin === info.origin) {
+           return true;
+         }

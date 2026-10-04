@@ -99,6 +99,7 @@ export function Planner({
     [planner.records, currentDay, from, zone, now],
   );
   const totals = progress(all, zone, now);
+  const elapsed = progress(all, zone, now, true);
   const blank = (): Task => newTask(crypto.randomUUID(), selected);
   async function action(work: () => Promise<unknown>) {
     try {
@@ -591,17 +592,58 @@ export function Planner({
             <p>
               For your selected period: {from} to {through}.
             </p>
-            <progress
-              max={Math.max(1, totals.total)}
-              value={totals.completed}
-            />
+            <div className="review-progress">
+              <div className="review-meter">
+                <div className="review-meter-top">
+                  <p>Scheduled</p>
+                  {totals.total > 0 ? (
+                    <strong>
+                      {totals.completed}
+                      <span> / {totals.total}</span>
+                    </strong>
+                  ) : (
+                    <p className="review-meter-note">
+                      No scheduled tasks in this period.
+                    </p>
+                  )}
+                </div>
+                {totals.total > 0 && (
+                  <progress
+                    max={totals.total}
+                    value={totals.completed}
+                    aria-label={`${totals.completed} of ${totals.total} scheduled tasks completed, skipped excluded`}
+                  />
+                )}
+              </div>
+              <div className="review-meter">
+                <div className="review-meter-top">
+                  <p>Completion rate</p>
+                  {elapsed.ratio === null ? (
+                    <p className="review-meter-note">No elapsed tasks yet</p>
+                  ) : (
+                    <strong>
+                      {Math.round(elapsed.ratio * 100)}
+                      <span>%</span>
+                    </strong>
+                  )}
+                </div>
+                {elapsed.total > 0 && (
+                  <progress
+                    max={elapsed.total}
+                    value={elapsed.completed}
+                    aria-label={`${elapsed.completed} of ${elapsed.total} elapsed tasks completed. Upcoming tasks are excluded.`}
+                  />
+                )}
+              </div>
+            </div>
             <p>
               {totals.completed} completed ·{" "}
               {all.filter((i) => i.state === "skipped").length} skipped ·{" "}
               {all.filter((i) => i.state === "pending").length} still to come
             </p>
             <p className="muted">
-              Skipped tasks are excluded from the progress total.
+              Skipped tasks are excluded from both totals. Upcoming tasks are
+              excluded from the completion rate.
             </p>
             {list(all.filter((item) => item.state === "completed"))}
           </section>

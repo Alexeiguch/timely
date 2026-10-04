@@ -5,11 +5,24 @@ import * as SecureStore from "expo-secure-store";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
 import Constants from "expo-constants";
-import {
-  GoogleSignin,
-  isSuccessResponse,
-} from "@react-native-google-signin/google-signin";
-import { Platform } from "react-native";
+import { Platform, TurboModuleRegistry } from "react-native";
+
+const googleSignInNativeModuleName = "RNGoogleSignin";
+
+export function isGoogleSignInAvailable() {
+  return TurboModuleRegistry.get(googleSignInNativeModuleName) !== null;
+}
+
+async function loadGoogleSignIn() {
+  if (!isGoogleSignInAvailable()) {
+    throw new Error(
+      "Google sign-in is not included in this app binary. Install a fresh Timely development build; Expo Go is not supported.",
+    );
+  }
+
+  return import("@react-native-google-signin/google-signin");
+}
+
 export const apiURL =
   process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 const scheme = Constants.expoConfig?.scheme;
@@ -27,6 +40,7 @@ export const authClient = createAuthClient({
 export async function signInGoogle() {
   if (!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID)
     throw new Error("Google sign-in is not configured");
+  const { GoogleSignin, isSuccessResponse } = await loadGoogleSignIn();
   GoogleSignin.configure({
     webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,

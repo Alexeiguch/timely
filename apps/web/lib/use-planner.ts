@@ -38,23 +38,23 @@ export function usePlanner(ownerId: string) {
   );
   const sync = useMemo(
     () =>
-      async (force = false) => {
+      async (force = false, quiet = false) => {
         if (!navigator.onLine) {
           setSyncStatus("Offline");
           return;
         }
+        if (!quiet) setSyncStatus("Syncing");
+        const run = () => engine.run(force, { quiet });
         if (navigator.locks)
-          await navigator.locks.request(`timely-sync:${ownerId}`, () =>
-            engine.run(force),
-          );
-        else await engine.run(force);
+          await navigator.locks.request(`timely-sync:${ownerId}`, run);
+        else await run();
       },
     [engine, ownerId],
   );
   useEffect(() => {
     const unsubscribe = store.subscribe(setState);
     const trigger = () => {
-      if (!document.hidden) void sync();
+      if (!document.hidden) void sync(false, true);
     };
     const offline = () => setSyncStatus("Offline");
     void sync();

@@ -8,6 +8,7 @@ import {
   visibleRecords,
   type LocalState,
   type LocalStore,
+  type SyncStatus,
   type Transport,
 } from "./engine";
 import { appendOperation, occurrenceTarget, reduceRecord } from "./records";
@@ -249,4 +250,48 @@ it("commits a reorder batch atomically and rolls back every command if one is in
   expect(reordered.map((i) => i.schedule)).toEqual(
     items.map((i) => i.schedule),
   );
+});
+function reachable(): Transport {
+  return async (path) => {
+    if (path === "devices/register") return {};
+    if (path === "sync/bootstrap")
+      return {
+        token: randomUUID(),
+        records: [],
+        watermark: 0,
+        next: null,
+        serverTime: Date.now(),
+      };
+    if (path.startsWith("sync/pull"))
+      return { changes: [], cursor: 0, more: false, serverTime: Date.now() };
+    throw new Error(path);
+  };
+}
+it("syncs quietly in the background and still reports the outcome", async () => {
+  const statuses: SyncStatus[] = [];
+  const engine = new SyncEngine(
+    memory(),
+    reachable(),
+    "web",
+    () => "UTC",
+    (value) => statuses.push(value),
+  );
+  await engine.run(false, { quiet: true });
+  expect(statuses).toEqual(["Synced"]);
+  await engine.run();
+  expect(statuses).toEqual(["Synced", "Syncing", "Synced"]);
+});
+it("reports a quiet sync that cannot reach the server", async () => {
+  const statuses: SyncStatus[] = [];
+  const engine = new SyncEngine(
+    memory(),
+    async () => {
+      throw new TypeError("offline");
+    },
+    "web",
+    () => "UTC",
+    (value) => statuses.push(value),
+  );
+  await engine.run(false, { quiet: true });
+  expect(statuses).toEqual(["Offline"]);
 });

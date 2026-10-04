@@ -213,13 +213,17 @@ export class SyncEngine {
     private zone: () => string,
     private status: (value: SyncStatus, message?: string) => void,
   ) {}
-  run(force = false) {
-    return (this.running ??= this.cycle(force).finally(() => {
-      this.running = null;
-    }));
+  run(force = false, options?: { quiet?: boolean }) {
+    return (this.running ??= this.cycle(force, options?.quiet === true).finally(
+      () => {
+        this.running = null;
+      },
+    ));
   }
-  private async cycle(force: boolean) {
-    this.status("Syncing");
+  private async cycle(force: boolean, quiet: boolean) {
+    // Background polls still publish the outcome. They skip the Syncing
+    // announcement so the planner does not flash a refresh indicator.
+    if (!quiet) this.status("Syncing");
     let sent: Pending[] = [];
     try {
       let state = await this.store.read();

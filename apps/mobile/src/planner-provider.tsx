@@ -163,33 +163,35 @@ export function PlannerProvider({
           );
       });
   };
-  const runSync = () =>
-    engine.run(true).catch(() => {
+  const runSync = () => {
+    setSyncStatus("Syncing");
+    return engine.run(true).catch(() => {
       if (alive.current)
         setLoadError(
           "Local storage is unavailable. Your saved files have not been cleared.",
         );
     });
+  };
   useEffect(() => {
     alive.current = true;
     reload();
     const unsubscribe = store.subscribe(reload);
-    const tick = () => {
+    const tick = (quiet: boolean) => {
       setNow(Date.now());
       setZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
       void engine
-        .run()
+        .run(false, { quiet })
         .catch(() => setLoadError("Unable to read local storage."));
     };
-    tick();
+    tick(false);
     const timer = setInterval(() => {
-      if (AppState.currentState === "active") tick();
+      if (AppState.currentState === "active") tick(true);
     }, 15000);
     const foreground = AppState.addEventListener("change", (value) => {
-      if (value === "active") tick();
+      if (value === "active") tick(true);
     });
     const network = Network.addNetworkStateListener((value) => {
-      if (value.isConnected && value.isInternetReachable !== false) tick();
+      if (value.isConnected && value.isInternetReachable !== false) tick(true);
       else setSyncStatus("Offline");
     });
     return () => {

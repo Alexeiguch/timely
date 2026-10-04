@@ -119,3 +119,38 @@ Never put secrets, OTPs or sessions into these documents. Neon authentication/se
 - Replaced the mobile folder's bare React Native/Node launch entries with Expo Tools Hermes attach configuration. Added matching root/folder tasks, extension recommendations and `mobile-debugging.md`. Existing owner edits to `apps/mobile/package.json` were preserved and excluded from this checkpoint.
 - Started Metro in VS Code, built and installed the signed iOS Debug app, connected to localhost:8081 and verified an actual breakpoint at `src/brand.tsx:4`, with original source/variables/call stack. Left the session paused for the owner. API remains localhost:3001.
 - Native TypeScript passes; configuration JSON parses. No new business tests needed. Expo-generated tsconfig removal was reverted; local React Native Tools cache is ignored.
+
+## Native Google sign-in configuration — 2026-09-30
+
+- Diagnosed disabled Google sign-in: public client IDs existed only in `.env.example`, which Expo does not load; no local mobile environment file existed. The installed Debug app also lacked the reversed iOS Google callback scheme, and the backend on port 3001 was stopped.
+- Created ignored, mode-0600 `apps/mobile/.env.local` from the owner's configured example with both public client IDs, localhost:3001 API address and the callback scheme derived from the iOS ID. Preserved owner edits to tracked configuration. Restarted Metro through the VS Code task and started the local backend; provider availability returns `google: true, apple: false`.
+- iOS prebuild and signed Debug rebuild pass (`/tmp/timely-google-build.log`). Verified the built Info.plist contains Google's callback, installed on the active iPhone 16e simulator and opened Google's real Timely sign-in page. Evidence: `evidence/mobile-google-sign-in-ios.png`. Native TypeScript passes.
+- Left Google authorization open for owner login. Account consent, ID-token exchange, session persistence and physical-device authentication remain unverified; no completed Google session is claimed. EAS cloud secret metadata was not inspected. Local Metro requires local environment values; EAS secret-visibility variables cannot be pulled locally. See `mobile-debugging.md` for executable configuration/rebuild steps.
+
+## Mobile expo-doctor diagnostic fix and Expo SDK 57 upgrade — 2026-09-30
+
+- Per owner instruction, upgraded the mobile app to Expo SDK 57 (`expo@~57.0.26`, `react-native@0.86.3`, `react@19.2.3`).
+- Aligned all native modules to their SDK 57 compatible versions (`@expo/dom-webview@~57.0.1`, `@expo/metro-runtime@~57.0.16`, `expo-apple-authentication@~57.0.2`, `expo-constants@~57.0.20`, `expo-crypto@~57.0.3`, `expo-dev-client@~57.0.19`, `expo-font@~57.0.4`, `expo-linking@~57.0.11`, `expo-network@~57.0.2`, `expo-notifications@~57.0.21`, `expo-router@~57.0.24`, `expo-secure-store@~57.0.4`, `expo-splash-screen@~57.0.9`, `expo-sqlite@~57.0.3`, `expo-status-bar@~57.0.1`, `expo-web-browser@~57.0.3`, `@react-native-community/datetimepicker@9.1.0`, `react-native-safe-area-context@~5.7.0`, `react-native-screens@~4.26.0`, `react-native-svg@15.15.4`).
+- Aligned monorepo `pnpm.overrides` for Expo 57 in [package.json](file:///Users/alexei/Documents/dev/Timely/package.json).
+- Added `expo-doctor` to [apps/mobile/package.json](file:///Users/alexei/Documents/dev/Timely/apps/mobile/package.json) devDependencies, added a `doctor` script (`expo-doctor`) to mobile, and added `doctor:mobile` (`pnpm --filter @timely/mobile run doctor`) to root scripts.
+- Verification: `npx expo-doctor` and `pnpm doctor:mobile` pass 21/21 checks with no issues detected. Mobile typecheck passes; unit tests pass (62/62); import boundaries pass.
+
+## Xcode 26.2 / Swift 6.2 local iOS compatibility — 2026-10-01
+
+- Fixed the SDK 57 local iOS build failure in upstream `expo-modules-jsi@57.1.1` with an exact-version pnpm patch. It removes invalid retained-return annotations from `RuntimeScheduler` constructors and uses Expo's existing unsafe-sendable wrapper for synchronous pointer/run-loop captures rejected by Swift 6.2.
+- Fixed the subsequent strict-concurrency errors in upstream `expo-modules-core@57.0.20` by using its existing weak unsafe-sendable wrapper for the two scheduled `EventEmitter` captures. No Timely behavior, authentication boundary or global Swift concurrency setting was weakened. See [ADR 007](decisions/007-expo-xcode-compatibility.md).
+- Verification: `pnpm exec expo run:ios --no-bundler` builds with zero errors, signs and installs the Debug app on the iPhone 16e simulator. The post-install attempt to foreground Simulator is denied by the host's AppleScript/System Events permission. Mobile TypeScript passes. Expo Doctor completes 20/21 checks and now reports duplicate peer variants in the monorepo dependency graph; the compiled native target contains the expected patched versions, but dependency deduplication remains follow-up work.
+
+## Expo Router Metro cache recovery — 2026-10-01
+
+- Reproduced the simulator failure by requesting its exact `apps/mobile/node_modules/expo-router/entry.bundle` URL: the running Metro server returned HTTP 404 despite `expo-router/entry.js` existing and resolving from `apps/mobile`. The package `main` field and Expo's automatic monorepo configuration were already correct.
+- Restarted Metro from `apps/mobile` with `--clear`, rebuilding the stale file map left after pnpm relinked `node_modules`. The same iOS bundle URL now returns HTTP 200 with a 12,361,650-byte JavaScript bundle.
+- Both checked-in **Mobile: Start Metro** tasks now include `--clear`, and the recovery command is documented in `mobile-debugging.md`. No hoisting change, custom Metro resolver or package-entry workaround was added.
+
+## VS Code Hermes debugger compatibility — 2026-10-01
+
+- Diagnosed gray, unbound VS Code breakpoints from the live Metro log: VS Code 1.140 with Expo Tools 1.6.3 connected to React Native 0.86's inspector without an `Origin` header, and the inspector rejected every connection with HTTP 401. The Hermes iOS target itself remained healthy and discoverable through `/json/list`.
+- Added an exact-version `@react-native/dev-middleware@0.86.3` pnpm patch. It permits a missing origin only when the request comes from a loopback address and includes both Expo's `type=vscode` marker and a `vscode/` user agent; normal origin validation remains unchanged for every other connection.
+- Fixed Expo Tools 1.6.3 passing a `vscode.Uri` as js-debug's `localRoot`, which caused `setBreakpoints` to fail with `The \"path\" argument must be of type string`. The installed extension now passes `project.root.fsPath`; `scripts/patch-expo-vscode-debugger.mjs` and matching VS Code tasks make the exact-version repair repeatable after an extension reinstall.
+- Standardized Metro and debugger attachment on IPv4 loopback and disabled the experimental turbo source-map path, which could bind a breakpoint but open the generated bundle. The normal Metro source map resolves original TypeScript correctly.
+- Verification: Metro served the iOS bundle with HTTP 200; a loopback Expo/VS Code WebSocket was accepted while an unidentified missing-origin request remained HTTP 401. After a simulator reload, the breakpoint was solid and VS Code paused at the original `apps/mobile/src/brand.tsx:3`, showing local variables and the TypeScript call stack. Mobile TypeScript and configuration checks pass. The session was left paused for the owner; F5 continues.

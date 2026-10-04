@@ -43,6 +43,7 @@ const config: ExpoConfig = {
     "expo-secure-store",
     "expo-apple-authentication",
     "expo-notifications",
+    "./plugins/with-expo-sqlite-ios",
     ...(process.env.GOOGLE_IOS_URL_SCHEME
       ? [
           [
