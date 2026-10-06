@@ -36,6 +36,7 @@ export function setState(
   zone: string,
   now: number,
 ): Occurrence {
+  if (occurrence.streak && state === "skipped") throw new Error("Streak tasks cannot be skipped.");
   return {
     ...occurrence,
     state,

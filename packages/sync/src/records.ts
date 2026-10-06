@@ -149,6 +149,19 @@ export function reduceRecord(record: TaskRecord): Series {
         series = { ...series, deleted: false, deletedFrom: null };
       else series = saveException(series, { ...selected, deleted: false });
     } else if (command.type === "state") {
+      const active = series.active.find(
+        (segment) =>
+          segment.from <= selected.originalDate &&
+          (!segment.through || segment.through >= selected.originalDate),
+      );
+      const current = series.revisions.find(
+        (revision) => revision.id === active?.revisionId,
+      )?.task;
+      if ((selected.streak || current?.streak) && command.state === "skipped")
+        throw new CommandError(
+          "INVALID_COMMAND",
+          "Streak tasks cannot be skipped.",
+        );
       series = saveException(series, {
         ...selected,
         state: command.state,
@@ -157,10 +170,10 @@ export function reduceRecord(record: TaskRecord): Series {
     } else if (command.type === "order") {
       series = saveException(series, { ...selected, order: command.order });
     } else if (command.scope === "occurrence") {
-      if ("rule" in command.patch)
+      if ("rule" in command.patch || "streak" in command.patch)
         throw new CommandError(
           "INVALID_COMMAND",
-          "Choose a series scope to change recurrence.",
+          "Choose a series scope to change recurrence or streak tracking.",
         );
       const { rule: _, ...fields } = command.patch;
       series = saveException(

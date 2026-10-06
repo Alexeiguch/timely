@@ -1,5 +1,15 @@
 # QA evidence — 2026-09-29
 
+
+## Recurring streak verification — 2026-10-06
+
+- `pnpm test`: 90 passing unit/SQLite tests; 11 real-DB checks skipped unless explicitly enabled. Seventeen added domain/sync checks cover deadline equality/late reset, DST, terminal-zone preservation, moves, future early completion, monthly invalid dates, 400-occurrence runs, two-device replay/dedupe, offline atomic rejection and legacy payload compatibility.
+- All nine workspace type checks, import boundary guard and production web build pass.
+- Real isolated-Neon: the ten existing integration checks passed in the full run. After correcting a test comparison of response-level server time, the added streak test passes on a targeted rerun; it verifies persistence, idempotent result replay, rejected Skip rollback, two-owner isolation and historical response parsing. The original test failure was an assertion error, not fake or bypassed persistence.
+- Real Chrome browser suite: 20/20 desktop/320px phone checks pass. New coverage includes editor opt-in, unavailable Skip, offline completion/reload, sync to a second real authenticated client, missed-deadline indicator and horizontal overflow check. Evidence: `streak-active-desktop.png`, `streak-active-phone.png`, `streak-ended-desktop.png`, `streak-ended-phone.png` under `docs/evidence/`. Active desktop/ended phone images were visually inspected.
+- Final iOS/Android Hermes exports pass to `/tmp/timely-streaks-native-export`. Native streak runtime/accessibility evidence on signed development builds remains pending; previous native compilation evidence is historical and does not substitute for this gate.
+- No new credentials, dependency versions, SQL migrations or remote release actions.
+
 This document retains chronological milestone evidence, not full planner acceptance. See [implementation-audit.md](implementation-audit.md) for the current 30 September status; earlier pending statements describe the date of their section.
 
 | Check | Result | Environment / evidence |

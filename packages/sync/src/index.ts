@@ -99,3 +99,5 @@ export * from "./account";
 export * from "./history";
 export * from "./reminders";
 export * from "./local-state";
+
+export * from "./streaks";

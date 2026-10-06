@@ -39,6 +39,7 @@ import { useAccount } from "./account";
 import { usePlanner } from "./planner-provider";
 import { PlannerStatus } from "./planner-header";
 import { Brand } from "./brand";
+import { StreakIndicator } from "./streak-indicator";
 import { TaskCard } from "./task-card";
 import { DateField } from "./date-field";
 import { PlannerDoodle } from "./doodle";
@@ -238,12 +239,14 @@ export function NativePlanner() {
       : null;
   const group = (items: Occurrence[]) => {
     const total = progress(items, p.zone, p.now);
+    const streakItem = items.find((item) => item.streak && item.state === "pending" && item.schedule.date >= p.currentDay) ?? items.at(-1)!;
     return (
       <View style={s.card}>
         <Text style={s.title}>{items[0]!.title}</Text>
         <Text style={s.body}>
           {total.completed} / {total.total} scheduled, excluding skipped
         </Text>
+        <StreakIndicator item={streakItem} />
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator

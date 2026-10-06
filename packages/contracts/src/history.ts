@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { Temporal } from "@js-temporal/polyfill";
-import { civilDate, id, taskSchema, zone } from "./model";
+import { civilDate, id, taskFieldsSchema, zone } from "./model";
 import { terminalSchema } from "./commands";
-export const occurrenceSchema = taskSchema.omit({ rule: true }).extend({
+export const occurrenceSchema = taskFieldsSchema.omit({ rule: true }).extend({
   definitionId: id, revisionId: id, slot: z.string().max(100), originalDate: civilDate,
   state: z.enum(["pending", "completed", "skipped"]), terminal: terminalSchema.nullable(),
   deleted: z.boolean(), order: z.string().max(128),

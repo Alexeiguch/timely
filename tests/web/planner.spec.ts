@@ -42,6 +42,56 @@ async function create(page: Page, title: string) {
     page.getByRole("heading", { name: title, exact: true }),
   ).toBeVisible();
 }
+test("streak opt-in, offline completion, ended deadlines and another device agree", async ({ page, context, browser }, info) => {
+  test.setTimeout(60000);
+  const email = `streak-proof-${randomUUID()}@example.test`;
+  await signIn(context, email);
+  await page.goto("/");
+  await expect(page.getByRole("status")).toContainText("Synced");
+  await page.getByRole("button", { name: "Add task", exact: true }).click();
+  await page.getByLabel("Task title").fill("Read a little each day");
+  await expect(page.getByLabel("Track a streak")).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Frequency", exact: true }).selectOption("daily");
+  await page.getByLabel("Track a streak").check();
+  await page.getByRole("button", { name: "Save task", exact: true }).click();
+  const card = page.locator("article.task-card").filter({ has: page.getByRole("heading", { name: "Read a little each day", exact: true }) });
+  await expect(card.getByText("Start your streak", { exact: true })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Skip", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("status")).toContainText("Synced");
+  await page.evaluate(async () => { await navigator.serviceWorker.ready; });
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  await context.setOffline(true);
+  await card.getByRole("checkbox").click();
+  await page.getByText("Completed & skipped (1)", { exact: true }).click();
+  await expect(card.getByText("1 in a row", { exact: true })).toBeVisible();
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.getByText("Completed & skipped (1)", { exact: true }).click();
+  await expect(card.getByText("1 in a row", { exact: true })).toBeVisible();
+  await context.setOffline(false);
+  await page.getByRole("button", { name: "Sync now", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Synced");
+  await page.screenshot({ path: `docs/evidence/streak-active-${info.project.name}.png`, fullPage: true });
+  const other = await browser.newContext({ baseURL: process.env.TEST_BASE_URL ?? "http://localhost:3000" });
+  try {
+    await other.setExtraHTTPHeaders({ "x-forwarded-for": `198.51.100.${Math.floor(Math.random() * 250) + 1}` });
+    await signIn(other, email);
+    const remote = await other.newPage();
+    await remote.goto("/");
+    await remote.getByText("Completed & skipped (1)", { exact: true }).click();
+    await expect(remote.getByText("1 in a row", { exact: true })).toBeVisible();
+  } finally { await other.close(); }
+  await page.getByRole("button", { name: "Add task", exact: true }).click();
+  await page.getByLabel("Task title").fill("A missed reading deadline");
+  await page.getByLabel("Date", { exact: true }).fill("2026-01-01");
+  await page.getByRole("combobox", { name: "Frequency", exact: true }).selectOption("daily");
+  await page.getByLabel("Track a streak").check();
+  await page.getByRole("button", { name: "Save task", exact: true }).click();
+  const missed = page.locator("article.task-card").filter({ has: page.getByRole("heading", { name: "A missed reading deadline", exact: true }) });
+  await expect(missed.getByText("Streak ended", { exact: true })).toBeVisible();
+  await expect(missed.getByRole("button", { name: "Skip", exact: true })).toHaveCount(0);
+  await page.screenshot({ path: `docs/evidence/streak-ended-${info.project.name}.png`, fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
 test.beforeEach(async ({ context }) => {
   await context.setExtraHTTPHeaders({
     "x-forwarded-for": `192.0.2.${Math.floor(Math.random() * 250) + 1}`,

@@ -9,6 +9,7 @@ import {
 import { date, preview, ruleSummary, recurrencePreset } from "@timely/domain";
 type Props = {
   initial: Task;
+  currentDay: string;
   occurrence?: Occurrence;
   onSave: (
     task: Task,
@@ -16,7 +17,13 @@ type Props = {
   ) => Promise<void>;
   onClose: () => void;
 };
-export function TaskEditor({ initial, occurrence, onSave, onClose }: Props) {
+export function TaskEditor({
+  initial,
+  currentDay,
+  occurrence,
+  onSave,
+  onClose,
+}: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [task, setTask] = useState(initial);
   const [scope, setScope] = useState<"occurrence" | "future" | "series">(
@@ -40,6 +47,7 @@ export function TaskEditor({ initial, occurrence, onSave, onClose }: Props) {
     patch({ rule: { ...task.rule!, ...change } as Rule });
   function frequency(value: string) {
     patch({
+      ...(value === "none" ? { streak: null } : {}),
       rule: recurrencePreset(
         value as Parameters<typeof recurrencePreset>[0],
         task.schedule.date,
@@ -456,6 +464,34 @@ export function TaskEditor({ initial, occurrence, onSave, onClose }: Props) {
             </>
           )}
         </fieldset>
+        {task.rule && (
+          <fieldset disabled={!ruleEditable} className="streak-setting">
+            <label className="row">
+              <input
+                type="checkbox"
+                checked={!!task.streak}
+                onChange={(event) =>
+                  patch({
+                    streak: event.target.checked
+                      ? { from: occurrence ? currentDay : task.rule!.anchor }
+                      : null,
+                  })
+                }
+              />
+              Track a streak
+            </label>
+            <p className="muted">
+              Complete each occurrence before its deadline to keep your streak.
+              Skipping is unavailable. Untimed tasks are due at the end of the
+              day; timed tasks are due at their time plus duration.
+            </p>
+            {!!occurrence && !ruleEditable && (
+              <p className="muted">
+                Choose a future or series scope to change streak tracking.
+              </p>
+            )}
+          </fieldset>
+        )}
         <p className="muted">
           Notification delivery is still being connected. Your task and repeat
           settings are saved now.

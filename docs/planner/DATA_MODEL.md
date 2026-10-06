@@ -31,6 +31,7 @@ Put auth tables in an explicit app-managed schema/namespace. Generate them from 
 
 ## Task fields and constraints
 
+- `streak`: optional nullable `{ from: civil date }` policy for recurring tasks; absence/null means off. It travels in existing validated journal payloads. Derive counts from occurrence history rather than persisting a counter. See [STREAKS.md](STREAKS.md).
 - `title`: trimmed nonempty text, max 200 characters; `notes`: optional text, max 10,000.
 - `priority`: nullable stable code `low`, `medium`, `high` with centralized UI labels.
 - `start_local_time`: nullable; `duration_minutes`: nullable integer 1–10,080.

@@ -27,10 +27,12 @@ import {
   setState,
   status,
   today,
+  streakKey,
 } from "@timely/domain";
 import {
   occurrenceTarget,
   reduceRecord,
+  streakSummaries,
   editableTask,
   editorCommand,
   linkedOccurrence,
@@ -38,6 +40,7 @@ import {
 } from "@timely/sync";
 import { civilDate, type Command, type Occurrence, type Task, type TaskRecord, type HistoryCursor } from "@timely/contracts";
 import { usePlanner } from "../lib/use-planner";
+import { StreakIndicator } from "./streak-indicator";
 import { TaskEditor } from "./task-editor";
 import { ActionDialog } from "./action-dialog";
 import { authClient } from "@timely/auth/client";
@@ -243,6 +246,7 @@ export function Planner({
   function movePeriod(direction: number) {
     setSelected(adjacentPeriod(selected, mode, direction));
   }
+  const streaks = useMemo(() => streakSummaries(planner.records, zone, now), [planner.records, zone, now]);
   function card(item: Occurrence) {
     const state = status(item, zone, now);
     return (
@@ -294,6 +298,7 @@ export function Planner({
           </div>
           <h3>{item.title}</h3>
           {item.notes && <p className="task-notes">{item.notes}</p>}
+          <StreakIndicator item={item} streak={streaks.get(streakKey(item))} zone={zone} now={now} />
           <div className="task-actions">
             <button
               aria-label={`Edit ${item.title}`}
@@ -301,7 +306,7 @@ export function Planner({
             >
               <Pencil size={15} /> Edit
             </button>
-            <button
+            {(!item.streak || item.state === "skipped") && <button
               onClick={() =>
                 void action(() =>
                   transition(
@@ -317,7 +322,7 @@ export function Planner({
                 <SkipForward size={15} />
               )}{" "}
               {item.state === "skipped" ? "Unskip" : "Skip"}
-            </button>
+            </button>}
             <button
               onClick={() =>
                 void action(() =>
@@ -617,6 +622,7 @@ export function Planner({
                   if (!items) return null;
                   if (items.length === 1) return card(items[0]!);
                   const count = progress(items, zone, now);
+                  const streakItem = items.find((item) => item.streak && item.state === "pending" && item.schedule.date >= currentDay) ?? items.at(-1)!;
                   return (
                     <article key={id} className="series-card">
                       <div className="row between">
@@ -625,6 +631,7 @@ export function Planner({
                           {count.completed} / {count.total} completed
                         </strong>
                       </div>
+                      <StreakIndicator item={streakItem} streak={streaks.get(streakKey(streakItem))} zone={zone} now={now} />
                       <div className="occurrence-strip">
                         {items.map((item) => (
                           <button
@@ -854,6 +861,7 @@ export function Planner({
       {editor && (
         <TaskEditor
           initial={editor.task}
+          currentDay={currentDay}
           occurrence={editor.occurrence}
           onSave={saveEditor}
           onClose={() => setEditor(null)}

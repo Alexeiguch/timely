@@ -21,7 +21,8 @@ import {
   reduceRecord,
   reducePreferences,
 } from "@timely/sync";
-import { projectSeries } from "@timely/domain";
+import { projectSeries, setState, streakKey } from "@timely/domain";
+import { streakSummaries } from "@timely/sync";
 const enabled = process.env.RUN_DB_TESTS === "1";
 describe.skipIf(!enabled)(
   "real PostgreSQL sync transactions",
@@ -83,6 +84,28 @@ describe.skipIf(!enabled)(
     afterAll(async () => {
       for (const id of owners) await db!.delete(user).where(eq(user.id, id));
       await connection!.client.end();
+    });
+    it("persists and deduplicates streak history, rejects Skip atomically and isolates owners", async () => {
+      const task = taskSchema.parse({ id: randomUUID(), title: "Synthetic streak", notes: "", priority: null,
+        schedule: { date: "2026-10-01", time: null, duration: null }, reminders: { enabled: false, before: true, overdue: true },
+        streak: { from: "2026-10-01" }, rule: { frequency: "daily", anchor: "2026-10-01", interval: 1, invalidDate: "clamp", end: { kind: "never" } } });
+      const now = Date.now();
+      const created = await push(owners[0]!, [op(task.id, { type: "create", task }, now - 3000)]);
+      const record = recordSchema.parse(created.results[0]!.record);
+      const item = projectSeries(reduceRecord(record), "2026-10-01", "2026-10-01")[0]!;
+      const done = setState(item, "completed", "Europe/London", Date.parse("2026-10-01T20:00Z"));
+      const command = op(task.id, { type: "state", target: occurrenceTarget(item), state: "completed", terminal: done.terminal }, now - 2000);
+      const saved = await push(owners[0]!, [command]);
+      const retry = await push(owners[0]!, [command]);
+      expect(retry.results).toEqual(saved.results);
+      expect(retry.watermark).toBe(saved.watermark);
+      const persisted = recordSchema.parse(saved.results[0]!.record);
+      expect(streakSummaries([persisted], "Europe/London", Date.parse("2026-10-02T10:00Z")).get(streakKey(item))?.count).toBe(1);
+      await expect(push(owners[0]!, [op(task.id, { type: "state", target: occurrenceTarget(item), state: "skipped", terminal: { ...done.terminal!, state: "skipped" } }, now - 1000)])).rejects.toThrow("cannot be skipped");
+      expect((await api!.pull(owners[0]!, saved.watermark)).changes).toEqual([]);
+      await expect(push(owners[1]!, [command])).rejects.toThrow("unavailable");
+      const historical = await historyRepository(db!).page(owners[0]!, { from: "2026-10-01", through: "2026-10-02", zone: "Europe/London", definitionId: task.id });
+      expect(historical.items[0]!.streak).toEqual(task.streak);
     });
     it("requires an owner-bound fresh session for deletion and cascades only that account", async () => {
       const ownerId = randomUUID(); owners.push(ownerId);

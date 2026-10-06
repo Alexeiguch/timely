@@ -16,6 +16,7 @@ import {
   setState as transition,
   type PlannerMode,
   projectSeries,
+  type Streak,
   type Scope,
 } from "@timely/domain";
 import {
@@ -34,6 +35,7 @@ import {
   savePreferences,
   retrySavedChanges,
   discardLocalChanges,
+  streakSummaries,
   accountActions,
   LocalReminderScheduler,
   linkedOccurrence,
@@ -66,6 +68,7 @@ type Undo = {
 };
 type Planner = {
   records: TaskRecord[];
+  streaks: Map<string, Streak>;
   state: LocalState | null;
   loadError: string;
   syncStatus: SyncStatus;
@@ -235,6 +238,7 @@ export function PlannerProvider({
     [state],
   );
   const records = visible.records;
+  const streaks = useMemo(() => streakSummaries(records, zone, now), [records, zone, now]);
   const currentDay = today(zone, now);
   useEffect(() => {
     void reconcileReminders();
@@ -289,6 +293,7 @@ export function PlannerProvider({
   };
   const value: Planner = {
     records,
+    streaks,
     history: (input) => loadHistory(authenticatedFetch, ownerId, input),
     state,
     loadError,
@@ -477,6 +482,7 @@ export function PlannerProvider({
       {editor && (
         <TaskEditor
           initial={editor.task}
+          currentDay={currentDay}
           item={editor.item}
           onClose={() => setEditor(null)}
           onSave={async (task, scope) => {

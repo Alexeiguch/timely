@@ -1,5 +1,10 @@
 # Implementation audit — current continuation 5–6 October 2026
 
+
+## Streak extension — 6 October 2026
+
+Owner-requested streaks now have shared deterministic deadline/history projection, durable tracking policy, web/native opt-in editors, individual/grouped indicators and enforced Skip rejection. See [contract](planner/STREAKS.md), [decision](decisions/012-recurring-task-streaks.md) and [evidence](qa-evidence.md). The extension adds 17 meaningful unit checks and two real browser executions, plus real DB persistence/owner-boundary proof. Native interaction acceptance remains pending; the full first-release gaps below remain open.
+
 ## Current changes and remaining work — 2026-10-05
 
 The detailed September audit below is a historical baseline. This section supersedes its statements that the following resources/flows are missing:

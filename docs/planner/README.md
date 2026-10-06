@@ -23,6 +23,7 @@ The owner has authorized writing these instructions. The implementation agent sh
 | [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) | Exact visual tokens and interaction requirements |
 | [DATA_MODEL.md](DATA_MODEL.md) | Storage, API resources, ownership and historical records |
 | [RECURRENCE_AND_TIME.md](RECURRENCE_AND_TIME.md) | Recurrence grammar, dates, overdue rules and edits |
+| [STREAKS.md](STREAKS.md) | Optional recurring-task streaks, deadlines, indicators and Skip restrictions |
 | [OFFLINE_SYNC.md](OFFLINE_SYNC.md) | Local persistence, operations, last-change-wins and recovery |
 | [NOTIFICATIONS.md](NOTIFICATIONS.md) | Before-task and overdue reminder delivery and cancellation |
 | [SOURCES.md](SOURCES.md) | Primary documentation and feasibility findings |

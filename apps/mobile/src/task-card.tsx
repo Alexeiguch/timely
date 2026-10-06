@@ -7,6 +7,7 @@ import { status, type Scope } from "@timely/domain";
 import { reduceRecord } from "@timely/sync";
 import { usePlanner } from "./planner-provider";
 import { Button, Sheet, s } from "./ui";
+import { StreakIndicator } from "./streak-indicator";
 import { DateField } from "./date-field";
 export function TaskCard({
   item,
@@ -129,6 +130,7 @@ export function TaskCard({
           </Text>
         )}
       </View>
+      <StreakIndicator item={item} />
       {!!item.notes && (
         <Text style={s.body} numberOfLines={3}>
           {item.notes}
@@ -158,18 +160,22 @@ export function TaskCard({
               planner.edit(item);
             }}
           />
-          <Button
-            title={item.state === "skipped" ? "Unskip" : "Skip this occurrence"}
-            onPress={() =>
-              planner.act(async () => {
-                await planner.changeState(
-                  item,
-                  item.state === "skipped" ? "pending" : "skipped",
-                );
-                setMenu(false);
-              })
-            }
-          />
+          {(!item.streak || item.state === "skipped") && (
+            <Button
+              title={
+                item.state === "skipped" ? "Unskip" : "Skip this occurrence"
+              }
+              onPress={() =>
+                planner.act(async () => {
+                  await planner.changeState(
+                    item,
+                    item.state === "skipped" ? "pending" : "skipped",
+                  );
+                  setMenu(false);
+                })
+              }
+            />
+          )}
           <Button
             title="Move to today"
             onPress={() => {
