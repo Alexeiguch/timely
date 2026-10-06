@@ -186,3 +186,9 @@ Never put secrets, OTPs or sessions into these documents. Neon authentication/se
 - Owner requested a quieter design and checkbox-only clicking in web Settings. Reminder toggles now use compact 24px controls with inline text; the text and row are separate from the input and do not toggle it. `aria-labelledby` preserves visible accessible names; Space and focus styling remain available. Form field names and saved preferences are preserved.
 - Changed `apps/web/components/planner.tsx` and `apps/web/app/globals.css`. Production web build/type check and `git diff --check` pass. Real Chrome checks at 741×887 and 320×740 confirm 24px dimensions, inert text/row clicks, checkbox/Space toggling, saved preferences through real sync/reload and no horizontal overflow. Visually inspected temporary desktop/phone form captures.
 - Local preview refreshed at `http://localhost:3001`; no deployment or native changes. Resume the native streak acceptance and first-release work recorded above. This checkpoint adds no new repository test suite for the small reversible presentation change.
+
+
+## Clickable reminder text — 2026-10-06
+
+- Latest owner correction supersedes checkbox-only clicking: both the text and checkbox now toggle each reminder default. Explicit native HTML labels preserve accessible names and the compact 24px design; empty row space stays inert.
+- Production web build/type check and diff check pass. Real Chrome at 741×887 and 320×740 confirms text/checkbox/Space toggling, inert empty row space, 24px dimensions and saved preferences after real sync/reload. Local preview refreshed; no native or remote deployment changes. Resume the outstanding native streak/release checks above.

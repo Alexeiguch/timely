@@ -862,6 +862,11 @@ a {
   accent-color: var(--primary);
   cursor: pointer;
 }
+.reminder-checkbox-row label {
+  display: block;
+  font-weight: inherit;
+  cursor: pointer;
+}
 .settings-card dl {
   display: grid;
   gap: 8px;
