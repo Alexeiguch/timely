@@ -807,8 +807,14 @@ export function Planner({
               event.preventDefault(); const data = new FormData(event.currentTarget);
               void action(() => planner.setPreferences({ reminders: { before: data.has("before"), overdue: data.has("overdue"), beforeMinutes: Number(data.get("beforeMinutes")), overdueMinutes: Number(data.get("overdueMinutes")), morning: String(data.get("morning")) } }));
             }} key={JSON.stringify(planner.preferences)}>
-              <label><input name="before" type="checkbox" defaultChecked={planner.preferences.before} /> Before a task</label>
-              <label><input name="overdue" type="checkbox" defaultChecked={planner.preferences.overdue} /> When overdue</label>
+              <div className="reminder-checkbox-row">
+                <input name="before" type="checkbox" aria-labelledby="reminder-before-label" defaultChecked={planner.preferences.before} />
+                <span id="reminder-before-label">Before a task</span>
+              </div>
+              <div className="reminder-checkbox-row">
+                <input name="overdue" type="checkbox" aria-labelledby="reminder-overdue-label" defaultChecked={planner.preferences.overdue} />
+                <span id="reminder-overdue-label">When overdue</span>
+              </div>
               <label>Minutes before a timed task<input name="beforeMinutes" type="number" min="0" max="10080" required defaultValue={planner.preferences.beforeMinutes} /></label>
               <label>Minutes after a timed task is due<input name="overdueMinutes" type="number" min="0" max="10080" required defaultValue={planner.preferences.overdueMinutes} /></label>
               <label>Untimed morning reminder<input name="morning" type="time" required defaultValue={planner.preferences.morning} /></label>

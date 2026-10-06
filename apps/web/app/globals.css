@@ -841,6 +841,27 @@ a {
 .settings-card > h2:not(:first-child) {
   margin-top: 32px;
 }
+.reminder-settings {
+  display: grid;
+  gap: 16px;
+}
+.reminder-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  font-weight: 500;
+}
+.reminder-checkbox-row input[type="checkbox"] {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
 .settings-card dl {
   display: grid;
   gap: 8px;
