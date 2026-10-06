@@ -3,7 +3,9 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { createDatabase } from "./index";
 import { planner } from "./planner";
-import { user, jobOutbox, syncOperations } from "./schema";
+import { historyRepository } from "./history";
+import { accountRepository, allowPlannerRequest } from "./account";
+import { user, session, syncDevices, jobOutbox, syncOperations } from "./schema";
 import {
   type Command,
   type Operation,
@@ -81,6 +83,63 @@ describe.skipIf(!enabled)(
     afterAll(async () => {
       for (const id of owners) await db!.delete(user).where(eq(user.id, id));
       await connection!.client.end();
+    });
+    it("requires an owner-bound fresh session for deletion and cascades only that account", async () => {
+      const ownerId = randomUUID(); owners.push(ownerId);
+      await db!.insert(user).values({ id: ownerId, name: "Deletion fixture", email: `${ownerId}@example.test`, emailVerified: true });
+      const recent = randomUUID(), stale = randomUUID();
+      await db!.insert(session).values([
+        { id: recent, token: randomUUID(), userId: ownerId, expiresAt: new Date(Date.now() + 86400000) },
+        { id: stale, token: randomUUID(), userId: ownerId, createdAt: new Date(Date.now() - 3600000), expiresAt: new Date(Date.now() + 86400000) },
+      ]);
+      await api!.register(ownerId, { id: deviceId, platform: "ios", zone: "Europe/London", protocolVersion: 1 });
+      await push(ownerId, [create()]);
+      await api!.bootstrap(ownerId, {});
+      const accounts = accountRepository(db!);
+      expect(await accounts.delete(ownerId, stale)).toBe(false);
+      expect(await accounts.delete(owners[1]!, recent)).toBe(false);
+      expect(await accounts.delete(ownerId, recent)).toBe(true);
+      expect(await db!.select().from(session).where(eq(session.userId, ownerId))).toHaveLength(0);
+      expect(await db!.select().from(syncOperations).where(eq(syncOperations.ownerId, ownerId))).toHaveLength(0);
+      expect(await db!.select().from(jobOutbox).where(eq(jobOutbox.ownerId, ownerId))).toHaveLength(0);
+      expect(await db!.select().from(user).where(eq(user.id, owners[1]!))).toHaveLength(1);
+    });
+    it("unregisters only the requested owner's installation and prevents uploads until registration", async () => {
+      await accountRepository(db!).unregister(owners[0]!, deviceId);
+      expect(await db!.select().from(syncDevices).where(eq(syncDevices.ownerId, owners[1]!))).toHaveLength(1);
+      await expect(push(owners[0]!, [create()])).rejects.toThrow("Register");
+      await api!.register(owners[0]!, { id: deviceId, platform: "web", zone: "UTC", protocolVersion: 1 });
+    });
+    it("shares an atomic per-owner limiter across concurrent requests and resets the window", async () => {
+      const now = Date.now() + 100000;
+      const results = await Promise.all(Array.from({ length: 185 }, () => allowPlannerRequest(owners[1]!, now, db!)));
+      expect(results.filter(Boolean)).toHaveLength(180);
+      expect(await allowPlannerRequest(owners[1]!, now + 60000, db!)).toBe(true);
+      expect(await allowPlannerRequest(owners[0]!, now, db!)).toBe(true);
+    });
+    it("paginates a fixed historical window with stable identities, filters and owner isolation", async () => {
+      const command = create();
+      if (command.command.type !== "create") throw new Error("fixture");
+      command.command.task.title = "Historical series";
+      command.command.task.rule = { frequency: "daily", anchor: "2026-09-29", interval: 1, end: { kind: "never" }, invalidDate: "clamp" };
+      await push(owners[0]!, [command]);
+      const history = historyRepository(db!);
+      const request = { from: "2026-09-29", through: "2026-10-05", zone: "Europe/London", definitionId: command.definitionId, limit: 2 };
+      let page = await history.page(owners[0]!, request);
+      const ids = page.items.map((item) => item.id);
+      const first = page.items[0]!;
+      await push(owners[0]!, [op(command.definitionId, { type: "edit", target: occurrenceTarget(first), scope: "series", patch: { title: "Changed later" }, currentDay: "2026-10-05" })]);
+      while (page.next) {
+        page = await history.page(owners[0]!, { ...request, cursor: page.next });
+        expect(page.items.every((item) => item.title === "Historical series")).toBe(true);
+        ids.push(...page.items.map((item) => item.id));
+      }
+      expect(ids).toHaveLength(7); expect(new Set(ids).size).toBe(7);
+      const other = await history.page(owners[1]!, request); expect(other.items).toHaveLength(0);
+      const resumed = await history.page(owners[0]!, request);
+      await expect(history.page(owners[1]!, { ...request, cursor: resumed.next })).rejects.toThrow("expired");
+      await expect(history.page(owners[0]!, { ...request, query: "Changed", cursor: resumed.next })).rejects.toThrow("filters");
+      await expect(history.page(owners[0]!, { ...request, through: "2028-10-05" })).rejects.toThrow("366");
     });
     it("replays a lost response exactly, bounds skew once, and rejects operation ID reuse", async () => {
       const command = create();

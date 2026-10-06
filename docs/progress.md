@@ -1,30 +1,31 @@
 # Implementation progress
 
 ## Current state
-- Updated: 2026-09-30. Full current step-by-step audit: [implementation-audit.md](implementation-audit.md).
-- Branch: `main`. Previous foundation/setup milestones: `df12576`, `b81f4c6`. The current milestone is the durable planner implementation; use `git log -1` for its final commit.
-- Owner request: continue implementation after the completed Neon hello deployment.
-- Last completed end-to-end capability: authenticated web task creation, offline reload and completion, reconnect, synchronization into a second real signed-in browser, recurrence creation/future edits, move/skip/unskip/delete with stable identity. Desktop and 320px phone tests pass.
-- Neon development branch created: `timely-development` / `br-autumn-mouse-b4zwfmwu`. Planner migrations and real transaction tests passed there. Production/root Neon link and hello Function are unchanged.
-- Web is a working local-first planner baseline. Native now includes four tabs, a full custom recurrence editor, scoped actions/Undo, explicit reorder and safe deep links in code. Hermes exports and iOS simulator builds pass; selected authenticated iOS simulator flows now pass; Android runtime and physical-device behavior remain unverified.
-- Canonical product contracts remain at `docs/planner/`; original `initial.md` and `planner-agent-pack/` remain unchanged.
-- Exact next action: complete Android/native accessibility and broader action tests, then resume the earliest incomplete API/storage work. iOS simulator authentication, planner, backend-disconnected restart/reconnect and browser regressions now pass. Then close stage 03 API/preferences/history/account-deletion and stage 04 recovery/indexed migration gaps before completing interaction/reminder/release work. No stage has full acceptance sign-off; see the audit for every remaining step.
+
+- Updated: 2026-10-06. The planner is usable in local web/native development; the complete first-release acceptance is still unfinished. See [release readiness](release-readiness.md) and [implementation audit](implementation-audit.md).
+- Current continuation: owner-scoped recent-session account deletion and device unregister, distributed PostgreSQL throttling, sync repair/discard, web scoped deletion/Undo/move/reorder/date-drop/navigation, bounded fixed-snapshot historical search, reminder defaults and native local scheduling. IndexedDB v2 and SQLite v3 migrate aggregate storage into indexed canonical records and pending operations while preserving clocks, UUIDs and staging. ADRs [008](decisions/008-account-recovery.md), [009](decisions/009-history-local-reminders.md), [010](decisions/010-local-storage-migrations.md) describe these changes.
+- Latest verified checks: 73 unit tests; 10/10 real isolated-Neon integration tests; all nine workspace type checks; boundary guard; production web build; 18/18 real desktop/320px phone browser tests. Browser migration preserves an actual offline queued creation through reload/reconnect. Final Hermes exports, Expo Doctor 21/21, signed ARM64 iOS simulator Release and Android Debug builds all pass with the supported native dependency pins.
+- Local review: built web at `http://localhost:3001`, Docker Postgres and Mailpit. Production/root Neon hello project is unchanged; no publishing, DNS or store submission was performed.
+- Branch at continuation start: `main`, clean working tree. Current work is on `codex/finish-planner`; use `git log -1` for the checkpoint after final verification.
+- Isolated Neon development branch: `timely-development` / `br-autumn-mouse-b4zwfmwu`. Use ignored `.env.neon-development` for its tests, not the root production environment.
+- Exact next engineering action: verify the supported Expo peer set and equivalent SQLite migration with pending work on native, finish indexed date projections/checkpointing and the stage 04 failure/scale matrix, then implement remote notification token/coverage handoff and durable Inngest delivery. Continue native/accessibility/provider evidence alongside this work. Local scheduling is implemented; remote delivery remains absent.
 
 ## Stage tracker
+
 | Stage | Status | Evidence / remaining work |
 | --- | --- | --- |
-| 00 Authentication | blocked_external | Real SMTP OTP, restoration and revocation pass. Google web credentials installed; initiation passes but Google rejects the unregistered local callback. Apple/Resend credentials, Google native IDs, HTTPS callback and physical iOS/Android provider evidence remain missing. |
-| 01 Foundation | in_progress | Workspace, strict TS, fonts/tokens, auth and planner shells, responsive web navigation, web/native bundles. Native visual/runtime proof and full accessibility matrix remain. |
-| 02 Shared domain | in_progress | Recurrence/time/scopes/history/reminders/ordering and canonical journal reducer tested. Added reversed structural edits plus offline completion, future-range tombstones and fast distant daily expansion. Further overlapping-scope/property/scale/Hermes fixtures remain. |
-| 03 Database/API | in_progress | Migration 0001, real owner-scoped register/push/pull/bootstrap, atomic audit/feed/jobs, exact dedupe and consistent snapshots pass on Neon. Preferences, materialization/history pagination, reminder coverage/registration, account deletion, shared production rate limiter and retention/checkpointing remain. |
-| 04 Offline/sync | in_progress | Durable IndexedDB and SQLite aggregate adapters, atomic outbox/clock, shared engine, shadow rebase, staged bootstrap, retries/401 retention, Web Locks and public-shell cache. Browser offline/restart/two-client proof passes. Indexed entity migrations, large-history tests, explicit invalid-operation recovery/discard, native device tests and reminder side-effects remain. |
-| 05 Web planner | in_progress | Real Day/Week/Month, editor with all rule frequencies/selectors/end modes, future edit scope, grouped month, occurrence actions, progress and sync status. Drag/reorder, undo/scoped delete, swipes/deep links, historical coverage expansion and complete accessibility matrix remain. |
-| 06 Mobile planner | in_progress | Four tabs, virtualized Day/Week/Month, full native custom recurrence editor, scope chooser, scoped delete/Undo, explicit reorder, heading swipes and safe deep links now exist. Selected authenticated iOS simulator flows, backend-disconnected restart/reconnect and screenshots now pass. Android runtime, physical devices, cross-device conflict proof and the full accessibility/gesture matrix remain. Long-press drag deferred (optional in stage 06). |
-| 07 Reminders | pending | Pure planner and transactionally queued invalidations. No native scheduling or remote worker/delivery yet. UI does not claim notifications work. |
-| 08 Review/Search/Settings | in_progress | Web selected-period search/review and diagnostics; native bounded date/status search/review, both progress metrics and settings now exist in code. Synchronized preferences, cross-month groups, paginated older history, complete filtering, link/unlink, deletion/recovery and native runtime evidence remain. |
-| 09 QA/release | pending | Not release-ready. Synthetic browser evidence and native bundle checks are not production provider/device verification. |
+| 00 Authentication | blocked_external | Real SMTP OTP, restoration/revocation and selected signed iOS simulator flows pass. Real Google consent/token exchange, Apple credentials/HTTPS callback, Resend and physical provider proof remain. Native Google IDs are locally configured; Android signing identities still need registered proof. |
+| 01 Foundation | in_progress | Strict workspace, bundled design/fonts, web/native shells, builds and CI configuration. Full accessibility/error-boundary/environment/reproducibility acceptance remains. |
+| 02 Shared domain | in_progress | Recurrence/scopes/terminal history/time/reminders/ordering tested. Broader overlap/property/scale and actual Hermes versus Node fixture evidence remain. |
+| 03 Database/API | in_progress | Owner-scoped sync/preferences, dedupe/fixed snapshots, bounded history/materialization, recent-auth deletion, unregister and shared limiter pass real DB checks. Notification token/coverage resources and retention/checkpointing remain. |
+| 04 Offline/sync | in_progress | Atomic durable commands, shadow rebase/staged bootstrap, retry/401 retention, repair/discard, indexed entity migrations and browser offline/queued-upgrade proof. Native upgrade, indexed date queries/checkpoints, large-account and full failure matrix remain. |
+| 05 Web planner | in_progress | Day/Week/Month/editor, drag/move/reorder, scoped delete/Undo, heading swipes, owned links, persistent navigation and history filters. Eighteen real browser checks pass; complete keyboard/zoom/screen-reader/dense-content acceptance remains. |
+| 06 Mobile planner | in_progress | Four tabs, full editor/scopes/actions/Undo/reorder/swipes/links/history. Selected prior iOS simulator flows pass; both native builds now compile. Equivalent Android/runtime/conflict/accessibility and physical-device gates remain. |
+| 07 Reminders | in_progress | Shared scheduling, contextual permission, seven-day/48-entry native reconciliation, crash recovery/cancellation and current-state taps implemented. Remote ownership/tokens/worker/receipts and real-device delivery/cancellation remain. |
+| 08 Review/Search/Settings | in_progress | Bounded date/state/priority/series/query history, paginated server snapshot, terminal context, both metrics and synchronized defaults/calendar settings. Cross-month monthly groups, safe provider link/unlink and full native evidence remain. |
+| 09 QA/release | in_progress | Broader unit/DB/browser checks, release preparation and disposable-service CI configuration. CI execution, complete device/security/scale/operations matrix and release artifacts remain. No release completion is claimed. |
 
-## Checks actually run for this milestone
+## Historical foundation checks — 2026-09-29
 - `pnpm test`: 46 unit tests pass across five suites. Four DB integration tests intentionally skip without `RUN_DB_TESTS=1`.
 - `RUN_DB_TESTS=1 node --env-file=.env.neon-development node_modules/vitest/vitest.mjs run packages/db/src/planner.integration.test.ts`: all four real Neon tests pass (about 25 seconds). Covers exact response-loss retry, one-time clock clamp, operation-ID collision, batch rollback including jobs/feed, two accounts and concurrent commits during snapshot pagination.
 - Applied `0000_talented_namorita.sql` and `0001_majestic_invaders.sql` on the new Neon development branch; applied incremental 0001 on local Docker Postgres. Reviewed generated schema migration. No planner migration on production.
@@ -39,21 +40,21 @@
 ## External dependencies
 | Missing item | Gate | Owner action when available |
 | --- | --- | --- |
-| Google callback registration and iOS/Android OAuth IDs | Provider proof | Web credentials installed locally. Add localhost callbacks for ports 3000/3001, then verify real consent/session; supply native client IDs for device proof. |
+| Google callback registration and Android signing identity proof | Provider proof | Web/native public IDs are configured locally. Register self-hosted callbacks and Android SHA identities, then verify real consent/token exchange on required devices. |
 | Apple Service/App IDs, generated client secret, HTTPS callback domain | Apple native/web proof | Configure developer account and callback. |
 | Verified Resend sender and API key | Hosted real mail | Configure sender; local Mailpit works. |
-| Signed development builds/physical devices | Native auth/SQLite/reminders | Run stated iOS/Android matrix after environment/app identifiers are ready. |
+| Registered app IDs, EAS/push/Inngest configuration and physical devices | Native auth/reminders | Use signed development builds and run the stated physical iOS/Android matrix. Local compilation and Node SQLite tests do not replace device proof. |
 
 Never put secrets, OTPs or sessions into these documents. Neon authentication/setup is already complete and is separate from these provider gates.
 
 ## Architecture and limitations
 - Self-hosted Better Auth remains the planner's identity provider. Root `neon.ts` managed-auth setting does not replace it.
 - `decisions/003-sync-persistence.md` documents the transaction/snapshot protocol, immutable authored revision commands and current aggregate/journal baseline.
-- Journals/full canonical feed payloads and account-wide local aggregates need checkpointing/indexed-table migration and scale evidence before release. This limitation is explicit; no history/outbox is silently truncated.
-- API body limits and a process-local per-owner throttle exist. Distributed rate limiting, further account/security endpoints and production operational controls remain outstanding.
+- Journals/full canonical feed payloads and full-account repository reads still need checkpointing/indexed-date projection and scale evidence before release. Entity-table migration is implemented. This limitation is explicit; no history/outbox is silently truncated.
+- API body limits and a shared PostgreSQL per-owner throttle exist. Notification resources, provider link/unlink and production operational controls remain outstanding.
 - Browser shell cache contains only public HTML and static build assets. No API/auth/private HTTP responses are cached.
-- Outbox errors remain durable and sign-out blocks with unsynced work. Explicit repair/discard/account deletion flows remain to implement.
-- Web overdue projection currently covers the previous year and labels that coverage. Search/Review operate on the selected period. Do not claim all older history is available offline.
+- Outbox errors remain durable. Explicit retry, task-dependent discard, confirmed discard/sign-out and recent-auth account deletion now exist.
+- Planner overdue projection covers the previous year and labels that coverage. Search/Review support up to 366 days per query plus fixed-snapshot online paging. Full downloaded history can be projected offline; history coverage is stated explicitly.
 
 ## Handoff
 - New code: `packages/contracts/src/commands.ts`, `packages/sync/src/{records,engine}.ts`, `packages/db/src/planner*.ts`, migration 0001, protected web sync/register handlers, web local store/planner/editor/service worker, native local store/planner and test suites.
@@ -154,3 +155,15 @@ Never put secrets, OTPs or sessions into these documents. Neon authentication/se
 - Fixed Expo Tools 1.6.3 passing a `vscode.Uri` as js-debug's `localRoot`, which caused `setBreakpoints` to fail with `The \"path\" argument must be of type string`. The installed extension now passes `project.root.fsPath`; `scripts/patch-expo-vscode-debugger.mjs` and matching VS Code tasks make the exact-version repair repeatable after an extension reinstall.
 - Standardized Metro and debugger attachment on IPv4 loopback and disabled the experimental turbo source-map path, which could bind a breakpoint but open the generated bundle. The normal Metro source map resolves original TypeScript correctly.
 - Verification: Metro served the iOS bundle with HTTP 200; a loopback Expo/VS Code WebSocket was accepted while an unidentified missing-origin request remained HTTP 401. After a simulator reload, the breakpoint was solid and VS Code paused at the original `apps/mobile/src/brand.tsx:3`, showing local variables and the TypeScript call stack. Mobile TypeScript and configuration checks pass. The session was left paused for the owner; F5 continues.
+
+
+## Continuation checkpoint — 2026-10-06
+
+- Implemented account/device lifecycle, owner-scoped limiter, durable retry/discard, web action/navigation parity, bounded snapshot history, synchronized reminder defaults, local native scheduling/tap/cancellation recovery and indexed local entity/outbox migrations. Local scheduling is actual Expo SDK code with deterministic recovery tests; remote delivery remains unimplemented.
+- Final checks: 73 unit/SQLite tests; 10 real isolated-Neon transaction/security tests; 18 real desktop/phone browser checks; all nine workspace types (mobile refreshed after SQL extraction); boundary guard; final production web build; Expo Doctor 21/21; both final Hermes exports. SQL migration/reopen/rollback tests use actual Node SQLite and preserve both accounts. Equivalent Expo runtime remains unverified.
+- Final signed ARM64 simulator Release: `EXPO_PUBLIC_API_URL=http://localhost:3001 xcodebuild -workspace Timelydevelopment.xcworkspace -scheme Timelydevelopment -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/timely-supported-ios ARCHS=arm64 CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build`, from `apps/mobile/ios`. Result: BUILD SUCCEEDED. Log `/tmp/timely-supported-ios.log`; artifact `/tmp/timely-supported-ios/Build/Products/Release-iphonesimulator/Timelydevelopment.app` includes the final JS bundle.
+- Final Android: `./gradlew assembleDebug --max-workers=2`, from `apps/mobile/android`. Result: BUILD SUCCESSFUL in 18m 25s, 760 tasks. Log `/tmp/timely-supported-android.log`; artifact `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk` (development/Metro-dependent). Current wrapper succeeds; its deprecation warnings do not constitute Gradle 10 compatibility.
+- Pod install succeeded; system Ruby could not use precompiled-module config, so those modules compiled from source. Existing exact-version Swift patches remain applied. The final dependency graph has no unmet native peer warnings; frozen installation succeeds.
+- Configured server-secret value scan: none found in 119 public web/native artifacts. No credentials/OTPs/session material appear in evidence. This targeted check does not replace a complete release security review.
+- Latest preview process: final built app on port 3001. Docker/Mailpit remain running. No production planner migration, deployment, DNS change, push provider dispatch or store submission occurred.
+- Branch: `codex/finish-planner`; current code/evidence/lockfile checkpoint is identifiable with `git log -1`. Remaining gates and exact next action are at the top of this file and in `release-readiness.md`. No full stage acceptance or finished-release claim is made.

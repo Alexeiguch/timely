@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   ChevronLeft,
@@ -33,10 +33,13 @@ import {
   reduceRecord,
   editableTask,
   editorCommand,
+  linkedOccurrence,
+  reorderCommands,
 } from "@timely/sync";
-import type { Occurrence, Task, TaskRecord } from "@timely/contracts";
+import { civilDate, type Command, type Occurrence, type Task, type TaskRecord, type HistoryCursor } from "@timely/contracts";
 import { usePlanner } from "../lib/use-planner";
 import { TaskEditor } from "./task-editor";
+import { ActionDialog } from "./action-dialog";
 import { authClient } from "@timely/auth/client";
 type Identity = { id: string; email: string; name: string };
 type Mode = "Day" | "Week" | "Month";
@@ -61,13 +64,68 @@ export function Planner({
   const [mode, setMode] = useState<Mode>("Day");
   const [tab, setTab] = useState("Planner");
   const [query, setQuery] = useState("");
+  const month = periodWindow(currentDay, "Month");
+  const [historyFrom, setHistoryFrom] = useState(month.from);
+  const [historyThrough, setHistoryThrough] = useState(month.through);
+  const [historyState, setHistoryState] = useState("all");
+  const [historyPriority, setHistoryPriority] = useState("all");
+  const [historyDefinition, setHistoryDefinition] = useState<string | undefined>();
+  const [remoteHistory, setRemoteHistory] = useState<Occurrence[] | null>(null);
+  const [historyCursor, setHistoryCursor] = useState<HistoryCursor | null>(null);
+  const [historyBusy, setHistoryBusy] = useState(false);
   const [editor, setEditor] = useState<{
     task: Task;
     occurrence?: Occurrence;
   } | null>(null);
   const [error, setError] = useState("");
+  const [undo, setUndo] = useState<{ label: string; definitionId: string; command: Command } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: "move" | "delete" | "account" | "discard-signout" | "discard"; item?: Occurrence; definitionId?: string } | null>(null);
+  const [scope, setScope] = useState<"occurrence" | "future" | "series">("occurrence");
+  const [moveDay, setMoveDay] = useState(currentDay);
+  const [navigationReady, setNavigationReady] = useState(false);
+  const swipe = useRef<{ x: number; y: number } | null>(null);
   const planner = usePlanner(identity.id);
   const { grouped, firstWeekday } = planner.preferences;
+  useEffect(() => {
+    const restore = () => {
+      const url = new URL(window.location.href);
+      let stored: { date?: string; mode?: string; tab?: string } = {};
+      try { stored = JSON.parse(localStorage.getItem(`timely-navigation:${identity.id}`) ?? "{}"); } catch { /* Ignore invalid navigation only. */ }
+      const day = url.searchParams.get("date") ?? stored.date;
+      if (civilDate.safeParse(day).success) setSelected(day!);
+      const view = url.searchParams.get("mode") ?? stored.mode;
+      if (view === "Day" || view === "Week" || view === "Month") setMode(view);
+      const destination = url.searchParams.get("tab") ?? stored.tab;
+      if (["Planner", "Review", "Search", "Settings"].includes(destination ?? "")) setTab(destination!);
+      setNavigationReady(true);
+    };
+    restore();
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, [identity.id]);
+  useEffect(() => {
+    if (!navigationReady) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("date", selected); url.searchParams.set("mode", mode); url.searchParams.set("tab", tab);
+    window.history.replaceState(null, "", url);
+    localStorage.setItem(`timely-navigation:${identity.id}`, JSON.stringify({ date: selected, mode, tab }));
+  }, [navigationReady, selected, mode, tab, identity.id]);
+  useEffect(() => {
+    if (!undo) return;
+    const timer = setTimeout(() => setUndo(null), 8000);
+    return () => clearTimeout(timer);
+  }, [undo]);
+  useEffect(() => {
+    if (!planner.state?.bootstrapped) return;
+    const url = new URL(window.location.href);
+    const occurrenceId = url.searchParams.get("occurrenceId");
+    if (!occurrenceId) return;
+    const item = linkedOccurrence(planner.records, { occurrenceId, day: url.searchParams.get("date") ?? selected, ownerId: url.searchParams.get("ownerId") ?? "" }, identity.id);
+    if (item) { setSelected(item.schedule.date); setMode("Day"); setTab("Planner"); edit(item); }
+    else setError("This linked occurrence is unavailable in your account.");
+    url.searchParams.delete("occurrenceId"); url.searchParams.delete("ownerId");
+    window.history.replaceState(null, "", url);
+  }, [planner.state?.bootstrapped]);
   const setGrouped = (value: boolean) =>
     void action(() => planner.setPreferences({ grouped: value }));
   useEffect(() => {
@@ -75,12 +133,29 @@ export function Planner({
     return () => clearInterval(interval);
   }, []);
   const { from, through } = periodWindow(selected, mode, firstWeekday);
+  const reviewing = tab === "Review" || tab === "Search";
+  const historyError = !civilDate.safeParse(historyFrom).success || !civilDate.safeParse(historyThrough).success || historyFrom > historyThrough || date(historyFrom).until(date(historyThrough)).days >= 366 ? "Choose a date range of up to 366 days." : "";
+  const projectionFrom = reviewing ? historyFrom : from, projectionThrough = reviewing ? historyThrough : through;
+  const historyKey = JSON.stringify([historyFrom, historyThrough, historyState, historyPriority, historyDefinition, query, zone]);
+  const currentHistoryKey = useRef(historyKey);
+  currentHistoryKey.current = historyKey;
+  useEffect(() => { setRemoteHistory(null); setHistoryCursor(null); }, [historyFrom, historyThrough, historyState, historyPriority, historyDefinition, query]);
+  async function historical() {
+    const requestedKey = historyKey;
+    setHistoryBusy(true);
+    await action(async () => {
+      const result = await planner.history({ from: historyFrom, through: historyThrough, zone, state: historyState as "all", priority: historyPriority as "all", query, definitionId: historyDefinition, limit: 100, ...(historyCursor ? { cursor: historyCursor } : {}) });
+      if (requestedKey !== currentHistoryKey.current) return;
+      setRemoteHistory((items) => [...(items ?? []), ...result.items]); setHistoryCursor(result.next);
+    });
+    setHistoryBusy(false);
+  }
   const all = useMemo(
     () =>
       planner.records
-        .flatMap((record) => projectSeries(reduceRecord(record), from, through))
+        .flatMap((record) => historyError && reviewing ? [] : projectSeries(reduceRecord(record), projectionFrom, projectionThrough))
         .sort(compareOccurrences),
-    [planner.records, from, through],
+    [planner.records, projectionFrom, projectionThrough, historyError, reviewing],
   );
   const overdue = useMemo(
     () =>
@@ -97,6 +172,12 @@ export function Planner({
             status(item, zone, now) === "overdue" && item.schedule.date < from,
         ),
     [planner.records, currentDay, from, zone, now],
+  );
+  const historicalItems = (remoteHistory ?? all).map((item) => all.find((current) => current.id === item.id) ?? item).filter((item) =>
+    (historyState === "all" || (historyState === "overdue" ? status(item, zone, now) === "overdue" : item.state === historyState)) &&
+    (historyPriority === "all" || (historyPriority === "none" ? item.priority === null : item.priority === historyPriority)) &&
+    (!historyDefinition || item.definitionId === historyDefinition) &&
+    (!query.trim() || `${item.title} ${item.notes}`.toLowerCase().includes(query.trim().toLowerCase()))
   );
   const totals = progress(all, zone, now);
   const elapsed = progress(all, zone, now, true);
@@ -117,6 +198,8 @@ export function Planner({
       state: next.state,
       terminal: next.terminal,
     });
+    setUndo({ label: value === "completed" ? "Task completed" : value === "skipped" ? "Occurrence skipped" : "Task reopened", definitionId: item.definitionId,
+      command: { type: "state", target: occurrenceTarget(item), state: item.state, terminal: item.terminal } });
   }
   function edit(item: Occurrence) {
     const record = planner.records.find((r) => r.id === item.definitionId)!;
@@ -136,6 +219,27 @@ export function Planner({
     );
     if (command) await planner.save(task.id, command);
   }
+  async function move(item: Occurrence, day: string) {
+    civilDate.parse(day);
+    await planner.save(item.definitionId, { type: "edit", target: occurrenceTarget(item), scope: "occurrence", patch: { schedule: { ...item.schedule, date: day } }, currentDay });
+    setUndo({ label: `Moved to ${day}`, definitionId: item.definitionId, command: { type: "edit", target: occurrenceTarget(item), scope: "occurrence", patch: { schedule: item.schedule }, currentDay } });
+  }
+  async function signOut(discard = false) {
+    await planner.prepareSignOut(discard);
+    try {
+      const result = await authClient.signOut();
+      if (result.error) throw new Error(result.error.message);
+      await planner.store.purge();
+      localStorage.removeItem(`timely-navigation:${identity.id}`);
+      onSignOut();
+    } catch (error) { planner.resume(); throw error; }
+  }
+  const dropped = (event: React.DragEvent, day: string) => {
+    event.preventDefault();
+    const id = event.dataTransfer.getData("application/x-timely-occurrence");
+    const item = all.find((item) => item.id === id);
+    if (item) void action(() => move(item, day));
+  };
   function movePeriod(direction: number) {
     setSelected(adjacentPeriod(selected, mode, direction));
   }
@@ -146,6 +250,8 @@ export function Planner({
         className={`task-card ${state === "overdue" ? "overdue" : ""}`}
         key={item.id}
         data-task-id={item.id}
+        draggable={item.state === "pending"}
+        onDragStart={(event) => { event.dataTransfer.setData("application/x-timely-occurrence", item.id); event.dataTransfer.effectAllowed = "move"; }}
       >
         <button
           className="complete-button"
@@ -169,6 +275,9 @@ export function Planner({
         </button>
         <div className="task-content">
           <div className="task-meta">
+            {reviewing && <span>{item.schedule.date}</span>}
+            {item.originalDate !== item.schedule.date && <span>Moved from {item.originalDate}</span>}
+            {item.terminal && <span>{item.terminal.state === "completed" ? "Completed" : "Skipped"} {new Date(item.terminal.at).toLocaleString()}</span>}
             <span>
               {item.schedule.time ?? "Any time"}
               {item.schedule.duration ? ` · ${item.schedule.duration} min` : ""}
@@ -212,38 +321,18 @@ export function Planner({
             <button
               onClick={() =>
                 void action(() =>
-                  planner.save(item.definitionId, {
-                    type: "edit",
-                    target: occurrenceTarget(item),
-                    scope: "occurrence",
-                    patch: {
-                      schedule: {
-                        ...item.schedule,
-                        date:
-                          item.schedule.date === currentDay
-                            ? addDays(currentDay, 1)
-                            : currentDay,
-                      },
-                    },
-                    currentDay,
-                  }),
+                  move(item, item.schedule.date === currentDay ? addDays(currentDay, 1) : currentDay),
                 )
               }
             >
               <ArrowRight size={15} />{" "}
               {item.schedule.date === currentDay ? "Tomorrow" : "Today"}
             </button>
+            <button aria-label={`Move ${item.title} to a date`} onClick={() => { setMoveDay(item.schedule.date); setDialog({ kind: "move", item }); }}>Move…</button>
+            {item.state === "pending" && item.schedule.time === null && ([-1, 1] as const).map((direction) => <button key={direction} aria-label={`Move ${item.title} ${direction < 0 ? "up" : "down"}`} onClick={() => void action(() => planner.saveBatch(reorderCommands(all, item, direction)))}>{direction < 0 ? "↑ Up" : "↓ Down"}</button>)}
             <button
               aria-label={`Delete ${item.title}`}
-              onClick={() =>
-                void action(() =>
-                  planner.save(item.definitionId, {
-                    type: "delete",
-                    target: occurrenceTarget(item),
-                    scope: "occurrence",
-                  }),
-                )
-              }
+              onClick={() => { setScope("occurrence"); setDialog({ kind: "delete", item }); }}
             >
               <Trash2 size={15} />
             </button>
@@ -386,7 +475,12 @@ export function Planner({
                 </label>
               </div>
             </section>
-            <div className="period-heading">
+            <div className="period-heading" onTouchStart={(event) => {
+              const touch = event.touches[0]; if (touch) swipe.current = { x: touch.clientX, y: touch.clientY };
+            }} onTouchEnd={(event) => {
+              const touch = event.changedTouches[0]; const start = swipe.current; swipe.current = null;
+              if (touch && start && Math.abs(touch.clientX - start.x) > 60 && Math.abs(touch.clientY - start.y) < 35) movePeriod(touch.clientX < start.x ? 1 : -1);
+            }}>
               <div>
                 <p className="muted">
                   {mode === "Day"
@@ -445,6 +539,8 @@ export function Planner({
                     return (
                       <button
                         key={day}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={(event) => dropped(event, day)}
                         style={
                           i === 0
                             ? {
@@ -501,7 +597,7 @@ export function Planner({
               <div className="week-agenda">
                 {Array.from({ length: 7 }, (_, i) => addDays(from, i)).map(
                   (day) => (
-                    <section key={day}>
+                    <section key={day} onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropped(event, day)}>
                       <h3>
                         {label(day, { weekday: "short", day: "numeric" })}
                       </h3>
@@ -562,6 +658,19 @@ export function Planner({
             )}
           </>
         )}
+        {reviewing && <section className="history-filters settings-card">
+          <div className="form-grid">
+            <label>From date<input type="date" value={historyFrom} min="1900-01-01" max="2100-12-31" onChange={(event) => setHistoryFrom(event.target.value)} /></label>
+            <label>Through date<input type="date" value={historyThrough} min="1900-01-01" max="2100-12-31" onChange={(event) => setHistoryThrough(event.target.value)} /></label>
+            <label>Task status<select aria-label="Task status" value={historyState} onChange={(event) => setHistoryState(event.target.value)}>{["all", "overdue", "pending", "completed", "skipped"].map((value) => <option key={value}>{value}</option>)}</select></label>
+            <label>Priority filter<select aria-label="Priority filter" value={historyPriority} onChange={(event) => setHistoryPriority(event.target.value)}>{["all", "none", "low", "medium", "high"].map((value) => <option key={value}>{value}</option>)}</select></label>
+            <label>Series filter<select aria-label="Series filter" value={historyDefinition ?? "all"} onChange={(event) => setHistoryDefinition(event.target.value === "all" ? undefined : event.target.value)}><option value="all">All plans</option>{planner.records.filter((record) => reduceRecord(record).revisions.some((revision) => revision.task.rule)).map((record) => <option key={record.id} value={record.id}>{reduceRecord(record).revisions.at(-1)!.task.title}</option>)}</select></label>
+          </div>
+          {historyError && <p role="alert">{historyError}</p>}
+          <p className="muted">{remoteHistory ? "Online snapshot for this range" : "Downloaded plans are available offline. Load online history to check a fixed server snapshot."}</p>
+          <button disabled={historyBusy || !!historyError || (remoteHistory !== null && historyCursor === null)} onClick={() => { void historical(); }}>{historyBusy ? "Loading…" : historyCursor ? "Load more history" : "Load online history"}</button>
+          {remoteHistory && <button onClick={() => { setRemoteHistory(null); setHistoryCursor(null); }}>Return to downloaded plans</button>}
+        </section>}
         {tab === "Search" && (
           <>
             <label className="search-field">
@@ -577,21 +686,13 @@ export function Planner({
               Searching the selected period, {from} to {through}. Older history
               search is still being connected.
             </p>
-            {list(
-              all.filter((item) =>
-                `${item.title} ${item.notes}`
-                  .toLowerCase()
-                  .includes(query.toLowerCase()),
-              ),
-            )}
+            {list(historicalItems)}
           </>
         )}
         {tab === "Review" && (
           <section className="review-card">
             <h2>{totals.completed} little wins</h2>
-            <p>
-              For your selected period: {from} to {through}.
-            </p>
+            <p>For your selected range: {historyFrom} to {historyThrough}.</p>
             <div className="review-progress">
               <div className="review-meter">
                 <div className="review-meter-top">
@@ -645,7 +746,7 @@ export function Planner({
               Skipped tasks are excluded from both totals. Upcoming tasks are
               excluded from the completion rate.
             </p>
-            {list(all.filter((item) => item.state === "completed"))}
+            {list(historicalItems)}
           </section>
         )}
         {tab === "Settings" && (
@@ -693,6 +794,19 @@ export function Planner({
                 <option value="all">All occurrences</option>
               </select>
             </label>
+            <h2>Reminder defaults</h2>
+            <p>These choices sync to mobile. This browser shows in-app overdue cues; system reminders are scheduled on mobile.</p>
+            <form className="reminder-settings" onSubmit={(event) => {
+              event.preventDefault(); const data = new FormData(event.currentTarget);
+              void action(() => planner.setPreferences({ reminders: { before: data.has("before"), overdue: data.has("overdue"), beforeMinutes: Number(data.get("beforeMinutes")), overdueMinutes: Number(data.get("overdueMinutes")), morning: String(data.get("morning")) } }));
+            }} key={JSON.stringify(planner.preferences)}>
+              <label><input name="before" type="checkbox" defaultChecked={planner.preferences.before} /> Before a task</label>
+              <label><input name="overdue" type="checkbox" defaultChecked={planner.preferences.overdue} /> When overdue</label>
+              <label>Minutes before a timed task<input name="beforeMinutes" type="number" min="0" max="10080" required defaultValue={planner.preferences.beforeMinutes} /></label>
+              <label>Minutes after a timed task is due<input name="overdueMinutes" type="number" min="0" max="10080" required defaultValue={planner.preferences.overdueMinutes} /></label>
+              <label>Untimed morning reminder<input name="morning" type="time" required defaultValue={planner.preferences.morning} /></label>
+              <button type="submit">Save reminder defaults</button>
+            </form>
             <h2>Your account</h2>
             <p>{identity.email}</p>
             <dl>
@@ -712,28 +826,31 @@ export function Planner({
                 Some changes need attention. They remain saved on this device.
               </p>
             )}
-            <button
-              onClick={() =>
-                void action(async () => {
-                  const state = await planner.store.read();
-                  if (state.outbox.length) {
-                    setError(
-                      "You have changes saved only on this device. Sync them before signing out.",
-                    );
-                    return;
-                  }
-                  const result = await authClient.signOut();
-                  if (result.error) throw new Error(result.error.message);
-                  await planner.store.purge();
-                  onSignOut();
-                })
-              }
-            >
-              Sign out
-            </button>
+            <button onClick={() => void action(() => planner.retry())}>Retry saved changes</button>
+            {Array.from(new Set(planner.state?.outbox.filter((pending) => pending.error).map((pending) => pending.operation.definitionId) ?? [])).map((definitionId) => <button key={definitionId} onClick={() => setDialog({ kind: "discard", definitionId })}>Discard this task’s unsynced changes</button>)}
+            <button onClick={() => void action(() => signOut())}>Sign out</button>
+            {!!planner.state?.outbox.length && <button onClick={() => setDialog({ kind: "discard-signout" })}>Discard changes and sign out</button>}
+            <button onClick={() => setDialog({ kind: "account" })}>Delete account</button>
           </section>
         )}
       </main>
+      {undo && <div className="undo-notice" aria-live="polite">{undo.label}<button onClick={() => void action(async () => { await planner.save(undo.definitionId, undo.command); setUndo(null); })}>Undo</button></div>}
+      {dialog && <ActionDialog title={dialog.kind === "move" ? "Move to a date" : dialog.kind === "delete" ? "Delete this plan?" : dialog.kind === "account" ? "Delete your account permanently?" : "Discard unsynced changes?"}
+        confirm={dialog.kind === "move" ? "Move" : dialog.kind === "delete" ? "Delete plan" : dialog.kind === "account" ? "Delete permanently" : "Discard changes"}
+        onClose={() => setDialog(null)} onConfirm={async () => {
+          if (dialog.kind === "move") await move(dialog.item!, moveDay);
+          else if (dialog.kind === "delete") {
+            const item = dialog.item!;
+            const operation = await planner.save(item.definitionId, { type: "delete", target: occurrenceTarget(item), scope });
+            setUndo({ label: "Plan deleted", definitionId: item.definitionId, command: { type: "restore", target: occurrenceTarget(item), scope, deletionId: operation.id } });
+          } else if (dialog.kind === "discard-signout") await signOut(true);
+          else if (dialog.kind === "discard") await planner.discard(dialog.definitionId!);
+          else { await planner.deleteAccount(); await authClient.signOut(); onSignOut(); window.location.assign("/"); }
+        }}>
+        {dialog.kind === "move" ? <label>New date<input type="date" value={moveDay} min="1900-01-01" max="2100-12-31" required onChange={(event) => setMoveDay(event.target.value)} /></label>
+          : dialog.kind === "delete" ? <><p>Completed and skipped history stays saved when deleting future plans.</p><label>Delete scope<select value={scope} onChange={(event) => setScope(event.target.value as typeof scope)}><option value="occurrence">This occurrence</option><option value="future">This and future occurrences</option><option value="series">Entire series</option></select></label></>
+          : <p>{dialog.kind === "account" ? "All tasks, history, preferences and sign-in sessions will be deleted. Sign in again within five minutes before continuing. This device’s unsynced changes will also be discarded." : "Unsynced changes will be permanently removed. Your last synchronized data will remain. Connect to finish signing out."}</p>}
+      </ActionDialog>}
       {editor && (
         <TaskEditor
           initial={editor.task}

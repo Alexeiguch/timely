@@ -46,7 +46,10 @@
       "expo": "57.0.26",
       "@expo/metro-runtime": "57.0.16",
       "@expo/dom-webview": "57.0.1",
-      "@expo/log-box": "57.0.4"
+      "@expo/log-box": "57.0.4",
+      "react-native-worklets": "0.10.1",
+      "react-native-reanimated": "4.5.1",
+      "@react-native/metro-config": "0.86.3"
     }
   }
 }

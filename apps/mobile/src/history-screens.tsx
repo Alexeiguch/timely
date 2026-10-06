@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { civilDate, type Occurrence } from "@timely/contracts";
+import { civilDate, type Occurrence, type HistoryCursor } from "@timely/contracts";
 import {
   compareOccurrences,
   formatCivilDate,
@@ -25,6 +25,26 @@ function History({ search }: { search: boolean }) {
   const [query, setQuery] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filter, setFilter] = useState("all");
+  const [priority, setPriority] = useState("all");
+  const [definitionId, setDefinitionId] = useState<string | undefined>();
+  const [remote, setRemote] = useState<Occurrence[] | null>(null);
+  const [cursor, setCursor] = useState<HistoryCursor | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const historyKey = JSON.stringify([from, through, query, filter, priority, definitionId, p.zone]);
+  const currentHistoryKey = useRef(historyKey);
+  currentHistoryKey.current = historyKey;
+  useEffect(() => { setRemote(null); setCursor(null); setHistoryError(""); }, [from, through, query, filter, priority, definitionId]);
+  async function historical() {
+    const requestedKey = historyKey;
+    setLoading(true); setHistoryError("");
+    try {
+      const page = await p.history({ from, through, zone: p.zone, state: filter as "all", priority: priority as "all", query, definitionId, limit: 100, ...(cursor ? { cursor } : {}) });
+      if (requestedKey !== currentHistoryKey.current) return;
+      setRemote((items) => [...(items ?? []), ...page.items]); setCursor(page.next);
+    } catch (error) { if (requestedKey === currentHistoryKey.current) setHistoryError(error instanceof Error ? error.message : "History unavailable. Downloaded plans remain available."); }
+    finally { setLoading(false); }
+  }
   const error =
     !civilDate.safeParse(from).success ||
     !civilDate.safeParse(through).success ||
@@ -44,12 +64,14 @@ function History({ search }: { search: boolean }) {
             .sort(compareOccurrences),
     [p.records, from, through, error],
   );
-  const items = all.filter(
+  const items = (remote ?? all).map((item) => all.find((current) => current.id === item.id) ?? item).filter(
     (item) =>
       (!query.trim() ||
         `${item.title} ${item.notes}`
           .toLocaleLowerCase()
           .includes(query.trim().toLocaleLowerCase())) &&
+      (priority === "all" || (priority === "none" ? item.priority === null : item.priority === priority)) &&
+      (!definitionId || item.definitionId === definitionId) &&
       (filter === "all" ||
         (filter === "overdue"
           ? status(item, p.zone, p.now) === "overdue"
@@ -132,6 +154,10 @@ function History({ search }: { search: boolean }) {
                   ]}
                   onChange={setFilter}
                 />
+                <Choices label="Priority filter" value={priority} options={["all", "none", "low", "medium", "high"].map((value) => ({ value, label: value }))} onChange={setPriority} />
+                <Choices label="Series filter" value={definitionId ?? "all"} options={[
+                  { value: "all", label: "All plans" }, ...p.records.filter((record) => reduceRecord(record).revisions.some((revision) => revision.task.rule)).map((record) => ({ value: record.id, label: reduceRecord(record).revisions.at(-1)!.task.title })),
+                ]} onChange={(value) => setDefinitionId(value === "all" ? undefined : value)} />
               </>
             )}
             {!!error && (
@@ -158,6 +184,12 @@ function History({ search }: { search: boolean }) {
             )}
           </View>
         }
+        ListFooterComponent={<View style={s.field}>
+          <Text style={s.muted}>{remote ? "Online historical snapshot for this range" : "Downloaded plans are available offline. Online history checks a fixed server snapshot."}</Text>
+          {historyError && <Text accessibilityRole="alert" style={s.error}>{historyError}</Text>}
+          <Button title={remote && cursor ? "Load more history" : "Load online history"} disabled={!!error || loading || (remote !== null && cursor === null)} onPress={() => { void historical(); }} />
+          {remote !== null && !cursor && <Button title="Return to downloaded plans" onPress={() => setRemote(null)} />}
+        </View>}
         ListEmptyComponent={
           <Text style={s.body}>
             {error

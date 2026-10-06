@@ -1,0 +1,45 @@
+# Release preparation and remaining gates
+
+No production publishing, DNS changes or store submissions have been performed. The existing Neon hello deployment remains unchanged. Local planner development uses Docker Postgres/Mailpit or the isolated `timely-development` Neon branch, never the root production environment.
+
+## Executable local checks
+
+```sh
+pnpm install --frozen-lockfile
+docker compose up -d
+pnpm db:migrate # supply the development DATABASE_MIGRATION_URL; see setup.md
+pnpm typecheck
+pnpm lint
+pnpm test
+RUN_DB_TESTS=1 node --env-file=.env.neon-development node_modules/vitest/vitest.mjs run packages/db/src/planner.integration.test.ts
+pnpm build
+APP_ENV=local BETTER_AUTH_URL=http://localhost:3001 pnpm --filter @timely/web start --port 3001
+TEST_BASE_URL=http://localhost:3001 pnpm test:e2e
+pnpm doctor:mobile
+pnpm --filter @timely/mobile exec expo export --platform ios --platform android --output-dir /tmp/timely-release-export
+```
+
+CI now defines disposable Postgres/Mailpit services, runs migrations and real transaction tests, then the built-app desktop/phone browser suite. The checked-in CI secret is synthetic and restricted to this test job. Do not use it for any deployed environment. The workflow still needs an actual CI execution; a local run is not proof of remote CI success.
+
+## Independent engineering gates still open
+
+- Remote reminders: notification device tokens/capabilities, coverage handoff, Inngest transactional-outbox processing and due sweep, conservative uncertain-send handling, receipt polling and invalid-token cleanup. Local scheduling is implemented; remote delivery is not enabled or claimed working.
+- Native runtime: equivalent Expo SQLite migration with pending work (SQL logic passes in Node), Android app flows, notification cancellation/delivery and account cleanup in signed development builds. Exports/native compilation do not prove OS presentation.
+- Scale and retention: indexed effective-date projections, canonical journal checkpointing and retained-cursor expiry with a realistic large-account benchmark. Historical projection is bounded/paginated; current UI still reads complete account repositories.
+- Remaining UX: full keyboard/screen-reader/zoom/large-text/gesture matrix, monthly cross-month groups, safe provider link/unlink and exhaustive two-device recurrence conflict fixtures.
+
+## External gates (`blocked_external`)
+
+1. Register the self-hosted Google callbacks for local ports 3000/3001 and final staging/production HTTPS origin, then verify real consent and token exchange on web/iOS/Android. Native Google requires registered platform client IDs and Android SHA identities.
+2. Supply Apple App/Service IDs, a current generated client secret and an HTTPS callback; verify first/repeat authorization and private relay on physical iOS plus supported Android browser flow.
+3. Configure a verified Resend sender and API key for hosted mail. Local SMTP evidence does not verify hosted mail.
+4. Choose registered production app identifiers, EAS project/signing credentials and physical iOS/Android test devices; configure push credentials and the eventual Inngest event/signing keys and approved cadence/plan.
+5. Authorize actual publication, production migrations, DNS changes and store submission only after reviewable release artifacts and the above checks are complete.
+
+## Recovery
+
+Settings can retry unchanged queued operations or explicitly discard all pending edits for one affected task. This preserves canonical data and unrelated tasks. An invalid atomic batch is isolated in singleton order before it blocks a command. Do not regenerate UUIDs for response-loss retries. Do not delete a local database to repair an outbox.
+
+If local stored-state validation or migration fails, preserve the database and reproduce from the same account/environment. Web storage upgrades retain the database name `timely-planner-v1`; native uses `timely-planner.db`. Account deletion requires real authentication within five minutes and explicit confirmation. Sign-out with local-only work requires synchronization or explicit confirmed discard. Native OS cancellation has a durable cleanup queue that survives account purge and retries after launch.
+
+Prepared deployment, operations and review gates are in [deployment.md](deployment.md), [operations.md](operations.md) and [release-checklist.md](release-checklist.md).

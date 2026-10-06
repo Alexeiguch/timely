@@ -52,7 +52,7 @@ export function TaskEditor({ initial, occurrence, onSave, onClose }: Props) {
   } catch {
     /* Inline validation handles incomplete form values on save. */
   }
-  const ruleEditable = !occurrence || scope !== "occurrence";
+  const ruleEditable = !occurrence || !initial.rule || scope !== "occurrence";
   return (
     <dialog
       ref={dialog}

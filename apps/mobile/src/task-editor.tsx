@@ -489,8 +489,7 @@ export function TaskEditor({
           {task.reminders.enabled && (
             <View style={s.card}>
               <Text style={s.muted}>
-                Your preferences will sync. Notification delivery is not yet
-                available in this build.
+                Your choices sync to every device. Allow notifications to schedule local reminders; check Settings for coverage.
               </Text>
               {(["before", "overdue"] as const).map((key) => (
                 <View key={key} style={s.row}>
