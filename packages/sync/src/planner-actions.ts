@@ -24,6 +24,7 @@ export function editableTask(record: TaskRecord, item: Occurrence): Task {
     schedule: { ...item.schedule },
     reminders: { ...item.reminders },
     rule: source.task.rule,
+    ...(item.streak !== undefined ? { streak: item.streak } : {}),
   };
 }
 export function editorCommand(
@@ -33,7 +34,11 @@ export function editorCommand(
   scope: Scope,
   currentDay: string,
 ): Command | null {
-  const task = taskSchema.parse(input);
+  const parsed = taskSchema.parse(input);
+  const task =
+    !item && parsed.streak
+      ? { ...parsed, streak: { from: parsed.rule!.anchor } }
+      : parsed;
   if (task.id !== initial.id || (item && item.definitionId !== task.id))
     throw new Error("Mismatched task identity.");
   if (!item) return { type: "create", task };
@@ -45,14 +50,15 @@ export function editorCommand(
     "schedule",
     "reminders",
     "rule",
+    "streak",
   ] as const)
     if (JSON.stringify(task[key]) !== JSON.stringify(initial[key]))
       Object.assign(patch, { [key]: task[key] });
   if (!Object.keys(patch).length) return null;
   const effective = !initial.rule && task.rule ? "series" : scope;
-  if (effective === "occurrence" && "rule" in patch)
+  if (effective === "occurrence" && ("rule" in patch || "streak" in patch))
     throw new Error(
-      "Choose this and future occurrences or the series to change recurrence.",
+      "Choose this and future occurrences or the series to change recurrence or streak tracking.",
     );
   return {
     type: "edit",

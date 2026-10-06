@@ -168,6 +168,9 @@ export function editSeries(
     throw new Error("Mismatched series identity");
   if (series.deleted) throw new Error("Cannot edit a deleted series");
   if (scope === "occurrence") {
+    const sourceTask = series.revisions.find((r) => r.id === selected.revisionId)?.task;
+    if (JSON.stringify(task.streak) !== JSON.stringify(sourceTask?.streak))
+      throw new Error("Streak tracking requires a series scope");
     if (
       JSON.stringify(task.rule) !==
       JSON.stringify(
@@ -229,7 +232,7 @@ export function editSeries(
     exceptions: { ...series.exceptions },
     aliases: { ...series.aliases },
   };
-  const changed = (key: Exception["explicit"][number]) =>
+  const changed = (key: keyof Task) =>
     JSON.stringify(source?.[key]) !== JSON.stringify(task[key]);
   for (const [id, exception] of Object.entries(result.exceptions)) {
     if (exception.value.state !== "pending" || exception.value.deleted)
@@ -238,7 +241,7 @@ export function editSeries(
     // Explicit pending exceptions survive the structural edit; retire their old generated counterparts.
     if (exception.explicit.length) {
       const value = { ...exception.value };
-      for (const key of ["title", "notes", "priority", "reminders"] as const) {
+      for (const key of ["title", "notes", "priority", "reminders", "streak"] as const) {
         if (changed(key)) Object.assign(value, { [key]: task[key] });
       }
       result.exceptions[id] = { ...exception, value };

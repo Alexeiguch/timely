@@ -1,4 +1,26 @@
-# Implementation audit — 30 September 2026
+# Implementation audit — current continuation 5–6 October 2026
+
+
+## Streak extension — 6 October 2026
+
+Owner-requested streaks now have shared deterministic deadline/history projection, durable tracking policy, web/native opt-in editors, individual/grouped indicators and enforced Skip rejection. See [contract](planner/STREAKS.md), [decision](decisions/012-recurring-task-streaks.md) and [evidence](qa-evidence.md). The extension adds 17 meaningful unit checks and two real browser executions, plus real DB persistence/owner-boundary proof. Native interaction acceptance remains pending; the full first-release gaps below remain open.
+
+## Current changes and remaining work — 2026-10-05
+
+The detailed September audit below is a historical baseline. This section supersedes its statements that the following resources/flows are missing:
+
+- Stage 03: owner-only bounded history and materialization projections with fixed pagination, recent-auth account deletion/session cascade, installation unregister and shared PostgreSQL planner rate limits now exist. Ten real isolated-Neon tests pass, including account isolation and stable history during concurrent edits. Notification token/capability/coverage resources and journal/feed checkpoint/retention remain missing.
+- Stage 04: IndexedDB v2 and SQLite v3 entity/outbox migrations, stored-payload validation, dependent-operation retry/discard and confirmed discard/sign-out are implemented. The real browser migration preserves an offline creation/UUID/clock through reconnect. Native migration runtime, indexed scheduled-date queries, checkpointing and representative large-account failure/scale evidence remain.
+- Stage 05: scoped delete/Undo, explicit move/reorder, date drops, heading swipes, owned links and durable account-specific navigation exist. Eighteen real browser checks pass on desktop and 320px phone, including deletion revoking another session and stale real history responses after a filter change. Full keyboard/screen-reader/zoom/dense-content acceptance is still open.
+- Stages 07–08: synchronized reminder defaults, contextual native permission and local seven-day/48-entry scheduling with durable crash recovery/cancellation and owned tap routing exist. Review/Search have date/state/priority/series/query filters and online snapshot paging. These are code plus deterministic adapter tests, not proof of physical OS delivery. Remote ownership/tokens/Inngest/dispatch/receipts, cross-month monthly-series groups and safe provider linking/unlinking remain missing.
+- Stage 09: CI now configures disposable Postgres/Mailpit, migrations, transaction tests and built-app browser checks. Deployment, operations and release checklists are prepared locally. Hosted CI and production backup/rollback checks have not run; no publication was authorized or performed.
+
+Expo 57 native peers are explicitly pinned to Worklets 0.10.1, Reanimated 4.5.1 and Metro config 0.86.3. Expo Doctor passes 21/21; current Hermes exports and web production build pass. Final signed ARM64 iOS simulator Release and Android Debug builds pass with that supported graph. Simulator automation stalled, so no new native runtime pass is claimed. Previous selected iOS simulator evidence remains valid only for its recorded older milestone.
+
+No stage is promoted to complete. Exact next actions, final native build outcomes and credential gates are in [progress](progress.md), [release readiness](release-readiness.md) and [QA evidence](qa-evidence.md). Current external gates are registered Google callbacks/Android signing proof, Apple credentials/HTTPS callback, hosted Resend, EAS/push/Inngest configuration and physical iOS/Android evidence. Engineering gaps above are independent of those external gates.
+
+## Historical detailed baseline — 2026-09-30
+
 
 **Update after this audit:** the mobile design/runtime milestone fixed Keychain build signing, a Hermes date-heading crash and off-screen recurrence scope selection. Selected iOS simulator authentication/planner/offline-restart/reconnect flows now pass; native logos/availability and screenshots exist. Browser regressions now pass 12/12 after the shared-helper refactor, and unit tests total 59. See `progress.md` and `qa-evidence.md` for the newer evidence. The detailed list below is the pre-fix audit baseline; Android/physical-device and later-stage gaps remain.
 

@@ -16,6 +16,7 @@ import {
   setState as transition,
   type PlannerMode,
   projectSeries,
+  type Streak,
   type Scope,
 } from "@timely/domain";
 import {
@@ -32,6 +33,13 @@ import {
   visibleRecords,
   visiblePreferences,
   savePreferences,
+  retrySavedChanges,
+  discardLocalChanges,
+  streakSummaries,
+  accountActions,
+  LocalReminderScheduler,
+  linkedOccurrence,
+  loadHistory,
   type LocalState,
   type SyncStatus,
 } from "@timely/sync";
@@ -42,12 +50,16 @@ import type {
   TaskRecord,
   Preferences,
   PreferencePatch,
+  HistoryRequest,
+  HistoryResponse,
 } from "@timely/contracts";
 import { authClient, authenticatedFetch } from "./auth";
 import { useAccount } from "./account";
-import { localStore } from "./local-store";
+import { localStore, queueNotificationCleanup } from "./local-store";
 import { TaskEditor } from "./task-editor";
 import { Button, s } from "./ui";
+import * as Notifications from "expo-notifications";
+import { notificationAdapter, requestReminderPermission, flushNotificationCleanup } from "./notifications";
 type Undo = {
   label: string;
   definitionId: string;
@@ -56,6 +68,7 @@ type Undo = {
 };
 type Planner = {
   records: TaskRecord[];
+  streaks: Map<string, Streak>;
   state: LocalState | null;
   loadError: string;
   syncStatus: SyncStatus;
@@ -80,7 +93,11 @@ type Planner = {
   move: (item: Occurrence, day: string) => Promise<void>;
   remove: (item: Occurrence, scope: Scope) => Promise<void>;
   reorder: (item: Occurrence, direction: -1 | 1) => Promise<void>;
-  signOut: () => Promise<void>;
+  signOut: (discard?: boolean) => Promise<void>;
+  deleteAccount: () => Promise<void>;
+  retry: () => Promise<void>;
+  history: (input: HistoryRequest) => Promise<HistoryResponse>;
+  discard: (definitionId: string) => Promise<void>;
   act: (work: () => Promise<void>) => void;
 };
 const Context = createContext<Planner | null>(null);
@@ -112,6 +129,11 @@ export function PlannerProvider({
   const [undoing, setUndoing] = useState(false);
   const alive = useRef(true);
   const store = useMemo(() => localStore(ownerId), [ownerId]);
+  const accountApi = useMemo(() => accountActions(authenticatedFetch, ownerId), [ownerId]);
+  const reminders = useMemo(() => new LocalReminderScheduler(store, notificationAdapter, () => Intl.DateTimeFormat().resolvedOptions().timeZone), [store]);
+  const reconcileReminders = () => reminders.run().catch(() => {
+    if (alive.current) setMessage("Some reminders could not be updated. Open Settings to retry.");
+  });
   const engine = useMemo(
     () =>
       new SyncEngine(
@@ -179,6 +201,7 @@ export function PlannerProvider({
     const tick = (quiet: boolean) => {
       setNow(Date.now());
       setZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+      void reconcileReminders();
       void engine
         .run(false, { quiet })
         .catch(() => setLoadError("Unable to read local storage."));
@@ -215,7 +238,24 @@ export function PlannerProvider({
     [state],
   );
   const records = visible.records;
+  const streaks = useMemo(() => streakSummaries(records, zone, now), [records, zone, now]);
   const currentDay = today(zone, now);
+  useEffect(() => {
+    void reconcileReminders();
+  }, [state?.clock.physical, state?.clock.logical, state?.cursor, state?.outbox.length]);
+  useEffect(() => {
+    const open = async (response: Notifications.NotificationResponse) => {
+      const data = response.notification.request.content.data ?? {};
+      if (typeof data.ownerId !== "string" || typeof data.occurrenceId !== "string" || typeof data.day !== "string") return;
+      const item = linkedOccurrence(visibleRecords(await store.read()).records, { ownerId: data.ownerId, occurrenceId: data.occurrenceId, day: data.day }, ownerId);
+      if (item) { setSelected(item.schedule.date); setMode("Day"); setEditor({ task: editableTask(visibleRecords(await store.read()).records.find((record) => record.id === item.definitionId)!, item), item }); }
+      else if (data.ownerId === ownerId) Alert.alert("Plan updated", "This occurrence is no longer available. Your current plans are unchanged.");
+      await Notifications.clearLastNotificationResponseAsync();
+    };
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => { void open(response); });
+    void Notifications.getLastNotificationResponseAsync().then((response) => { if (response) void open(response); });
+    return () => subscription.remove();
+  }, [store, ownerId]);
   const persist = async (
     definitionId: string,
     command: Command,
@@ -228,6 +268,7 @@ export function PlannerProvider({
       command,
       Crypto.randomUUID,
     );
+    await reconcileReminders();
     setSyncStatus("Saved locally");
     setUndo(
       inverse
@@ -247,8 +288,13 @@ export function PlannerProvider({
       ),
     );
   };
+  const clearLocalAccount = async () => {
+    try { await store.purge(); } finally { await account.clear(); }
+  };
   const value: Planner = {
     records,
+    streaks,
+    history: (input) => loadHistory(authenticatedFetch, ownerId, input),
     state,
     loadError,
     syncStatus,
@@ -266,6 +312,7 @@ export function PlannerProvider({
     preferences,
     setPreferences: async (patch) => {
       await savePreferences(store, patch, Crypto.randomUUID);
+      await reconcileReminders();
       setSyncStatus("Saved locally");
       void runSync();
     },
@@ -365,16 +412,48 @@ export function PlannerProvider({
       setSyncStatus("Saved locally");
       void runSync();
     },
-    signOut: async () => {
+    retry: async () => {
+      await engine.pause();
+      try { await retrySavedChanges(store); } finally { engine.resume(); }
+      await runSync();
+    },
+    discard: async (definitionId) => {
+      await engine.pause();
+      try { await discardLocalChanges(store, definitionId); } finally { engine.resume(); }
+      await runSync();
+    },
+    deleteAccount: async () => {
+      await engine.pause();
+      await reminders.pause();
+      try {
+        await accountApi.delete();
+      } catch (error) { engine.resume(); reminders.resume(); throw error; }
+      try {
+        await queueNotificationCleanup(ownerId);
+        await flushNotificationCleanup().catch(() => { /* Retry after restart; account cleanup still completes. */ });
+      } finally {
+        // A revoked account must leave memory even if storage or OS cleanup fails.
+        try { await authClient.signOut(); } finally { await clearLocalAccount(); }
+      }
+    },
+    signOut: async (discard = false) => {
       await engine.run(true);
-      if ((await store.read()).outbox.length)
-        throw new Error(
-          "You have unsynced changes. Reconnect and sync before signing out.",
-        );
-      const result = await authClient.signOut();
-      if (result.error) throw new Error(result.error.message);
-      await store.purge();
-      await account.clear();
+      await engine.pause();
+      await reminders.pause();
+      let signedOut = false;
+      try {
+        const current = await store.read();
+        if (current.outbox.length && !discard)
+          throw new Error("You have unsynced changes. Reconnect and sync before signing out.");
+        await accountApi.unregister(current.deviceId);
+        const result = await authClient.signOut();
+        if (result.error) throw new Error(result.error.message);
+        signedOut = true;
+        try {
+          await queueNotificationCleanup(ownerId);
+          await flushNotificationCleanup().catch(() => { /* Account-local cleanup stays queued. */ });
+        } finally { await clearLocalAccount(); }
+      } catch (error) { if (!signedOut) { engine.resume(); reminders.resume(); } throw error; }
     },
     act,
   };
@@ -403,6 +482,7 @@ export function PlannerProvider({
       {editor && (
         <TaskEditor
           initial={editor.task}
+          currentDay={currentDay}
           item={editor.item}
           onClose={() => setEditor(null)}
           onSave={async (task, scope) => {
@@ -414,6 +494,7 @@ export function PlannerProvider({
               currentDay,
             );
             if (command) await persist(task.id, command);
+            if (task.reminders.enabled) { await requestReminderPermission(); await reconcileReminders(); }
           }}
         />
       )}

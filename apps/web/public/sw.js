@@ -1,6 +1,6 @@
 // Only the public client shell, app icons and immutable build assets enter the cache.
-// Auth/API responses, RSC requests, task content and other navigation URLs never do.
-const CACHE = "timely-public-shell-v2";
+// Auth/API responses, RSC requests, task content and other navigation paths never do.
+const CACHE = "timely-public-shell-v3";
 const icon = (url) => ["/favicon.ico", "/icon.svg"].includes(url.pathname);
 const asset = (url) =>
   url.origin === self.location.origin &&
@@ -91,8 +91,7 @@ self.addEventListener("fetch", (event) => {
     );
   } else if (
     request.mode === "navigate" &&
-    url.pathname === "/" &&
-    !url.search
+    url.pathname === "/"
   ) {
     event.respondWith(
       caches.open(CACHE).then(async (cache) => {

@@ -11,6 +11,7 @@ A friendly personal planner helps a person capture important tasks, understand a
 - Optional priorities: unset, low, medium, high. Stable internal values have configurable display labels so later wording can become normal, important and urgent without corrupting old data.
 - Complete, reopen, skip, unskip, edit, delete, move to today and move to another date.
 - Friendly customizable recurrence and explicit recurring-edit scopes.
+- Optional recurring-task streaks with deadline-based completion and friendly per-task indicators; see [STREAKS.md](STREAKS.md).
 - Day, Week and Month planner modes and grouped recurring progress.
 - Quick Add, Overdue, Review, Search and Settings.
 - Full offline reading and editing after successful initial sign-in and data bootstrap.
@@ -61,6 +62,8 @@ Persist pending, completed or skipped for each occurrence. Derive upcoming, in p
 
 Skip means deliberately omit this occurrence, clears reminders and removes it from the completion-rate denominator. Reopening a completed/skipped occurrence restores pending state; overdue is recomputed. Undo uses a new compensating edit, never deletes history or an acknowledged operation.
 
+Streak tasks cannot be skipped. Their current run ends when an occurrence misses its existing deadline; a later on-time occurrence starts a new run. Tracking is an optional series choice, initially off.
+
 Move to today preserves the occurrence identity, source-series relationship and historical original date. Preserve its start time/duration unless the user edits them. If that creates an already-overdue schedule, show that fact before or immediately alongside the move; offer time adjustment. Moving one occurrence does not shift the recurrence cadence. Manual ordering and date moves are distinct operations.
 
 ## Review and progress
@@ -69,7 +72,7 @@ Review offers missed/pending overdue, completed, and skipped history, with date 
 
 - **Month progress:** completed / all scheduled, non-skipped occurrences in that month, including upcoming ones.
 - **Completion rate:** completed / elapsed due, non-skipped occurrences in the selected period. Future occurrences are excluded. Show an empty-state label for a zero denominator, not NaN or a misleading 0%.
-- A late completion counts as completed; original planned date and completion timestamp remain available. Avoid moralizing language or punitive streaks.
+- A late completion counts as completed; original planned date and completion timestamp remain available. Streaks require completion before the deadline and do not change these ordinary progress denominators. Use friendly, nonjudgmental wording.
 
 Use the effective rescheduled date for current planner/progress placement and preserve original planned date for historical context. Record terminal snapshots so later time-zone changes do not rewrite the period in which historical work was completed or skipped.
 

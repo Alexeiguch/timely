@@ -1,4 +1,5 @@
 import { Temporal } from "@js-temporal/polyfill";
+import { v5 } from "uuid";
 import type { Occurrence, Preferences, Task } from "@timely/contracts";
 export const date = (value: string) => Temporal.PlainDate.from(value);
 export const addDays = (value: string, count: number) =>
@@ -35,6 +36,7 @@ export function setState(
   zone: string,
   now: number,
 ): Occurrence {
+  if (occurrence.streak && state === "skipped") throw new Error("Streak tasks cannot be skipped.");
   return {
     ...occurrence,
     state,
@@ -94,13 +96,14 @@ export function planReminders(
   )
     return [];
   const { start, due } = boundaries(occurrence.schedule, zone);
-  const version = JSON.stringify([
+  const version = v5(JSON.stringify([
     occurrence.id,
     occurrence.schedule,
     occurrence.reminders,
-    preferences,
+    { morning: preferences.morning, beforeMinutes: preferences.beforeMinutes, overdueMinutes: preferences.overdueMinutes,
+      before: preferences.before, overdue: preferences.overdue },
     zone,
-  ]);
+  ]), "29f5edcf-6c42-4cd1-909b-e2d55a0793fa");
   const before =
     start === null
       ? instant(occurrence.schedule.date, preferences.morning, zone)
@@ -129,6 +132,9 @@ export function planReminders(
       version,
     });
   return plans;
+}
+export function reminderIdentity(deviceId: string, plan: ReminderPlan) {
+  return v5(JSON.stringify([deviceId, plan.occurrenceId, plan.kind, plan.version]), "f270fa7d-b2ac-4a32-b39d-77a46d6915ec");
 }
 
 /** Format civil fields only. Temporal's Intl bridge is unreliable on Hermes.

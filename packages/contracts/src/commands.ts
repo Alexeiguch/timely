@@ -11,6 +11,7 @@ import {
   ruleSchema,
   scheduleSchema,
   stampSchema,
+  streakPolicySchema,
   taskSchema,
   zone,
 } from "./model";
@@ -29,6 +30,7 @@ export const patchSchema = contentSchema
     schedule: scheduleSchema.optional(),
     reminders: reminderPolicySchema.optional(),
     rule: ruleSchema.nullable().optional(),
+    streak: streakPolicySchema.optional(),
   })
   .strict()
   .refine(

@@ -174,6 +174,7 @@ export function occurrence(
     originalDate: slot.date,
     title: task.title,
     notes: task.notes,
+    ...(task.streak !== undefined ? { streak: task.streak } : {}),
     priority: task.priority,
     schedule: { ...task.schedule, date: slot.date },
     reminders: { ...task.reminders },

@@ -41,11 +41,13 @@ const months = [
 ];
 export function TaskEditor({
   initial,
+  currentDay,
   item,
   onSave,
   onClose,
 }: {
   initial: Task;
+  currentDay: string;
   item?: Occurrence;
   onSave: (task: Task, scope: Scope) => Promise<void>;
   onClose: () => void;
@@ -66,8 +68,9 @@ export function TaskEditor({
     () => (validRule.success ? preview(validRule.data) : []),
     [validRule],
   );
-  const ruleChanged =
-    JSON.stringify(initial.rule) !== JSON.stringify(task.rule);
+  const seriesChoiceChanged =
+    JSON.stringify(initial.rule) !== JSON.stringify(task.rule) ||
+    JSON.stringify(initial.streak) !== JSON.stringify(task.streak);
   const close = () => {
     if (saving) return;
     if (JSON.stringify(task) === JSON.stringify(initial)) {
@@ -116,7 +119,7 @@ export function TaskEditor({
           <Text style={s.body}>
             Completed history stays unchanged by series edits.
           </Text>
-          {!ruleChanged && (
+          {!seriesChoiceChanged && (
             <Button
               title="Only this occurrence"
               disabled={saving}
@@ -246,6 +249,7 @@ export function TaskEditor({
             ]}
             onChange={(value) =>
               patch({
+                ...(value === "none" ? { streak: null } : {}),
                 rule: recurrencePreset(
                   value as Parameters<typeof recurrencePreset>[0],
                   task.schedule.date,
@@ -476,6 +480,32 @@ export function TaskEditor({
               </Text>
             </View>
           )}
+          {task.rule && (
+            <View style={s.card}>
+              <View style={s.row}>
+                <Text style={[s.label, s.grow]}>Track a streak</Text>
+                <Switch
+                  accessibilityLabel="Track a streak"
+                  value={!!task.streak}
+                  onValueChange={(enabled) =>
+                    patch({
+                      streak: enabled
+                        ? { from: item ? currentDay : task.rule!.anchor }
+                        : null,
+                    })
+                  }
+                />
+              </View>
+              <Text style={s.body}>
+                Complete each occurrence before its deadline to keep your
+                streak. Skipping is unavailable.
+              </Text>
+              <Text style={s.muted}>
+                Untimed tasks are due at the end of the day; timed tasks are due
+                at their time plus duration.
+              </Text>
+            </View>
+          )}
           <View style={s.row}>
             <Text style={[s.label, s.grow]}>Warn me</Text>
             <Switch
@@ -489,8 +519,8 @@ export function TaskEditor({
           {task.reminders.enabled && (
             <View style={s.card}>
               <Text style={s.muted}>
-                Your preferences will sync. Notification delivery is not yet
-                available in this build.
+                Your choices sync to every device. Allow notifications to
+                schedule local reminders; check Settings for coverage.
               </Text>
               {(["before", "overdue"] as const).map((key) => (
                 <View key={key} style={s.row}>

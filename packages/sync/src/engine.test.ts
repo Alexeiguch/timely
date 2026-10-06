@@ -295,3 +295,31 @@ it("reports a quiet sync that cannot reach the server", async () => {
   await engine.run(false, { quiet: true });
   expect(statuses).toEqual(["Offline"]);
 });
+it("isolates a rejected atomic batch before blocking one command and recovers unrelated edits", async () => {
+  const store = memory(), first = task(), blocked = task(), last = task();
+  const operations: Operation[] = [];
+  for (const item of [first, blocked, last]) operations.push(await saveLocal(store, item.id, { type: "create", task: item }, randomUUID));
+  const remote = new Map<string, TaskRecord>(); let cursor = 0;
+  const engine = new SyncEngine(store, async (path, body) => {
+    if (path === "devices/register") return {};
+    if (path === "sync/bootstrap") return { token: randomUUID(), records: [], watermark: 0, next: null, serverTime: Date.now() };
+    if (path.startsWith("sync/pull")) return { changes: [], cursor, more: false, serverTime: Date.now() };
+    const commands = (body as { operations: Operation[] }).operations;
+    if (commands.some((operation) => operation.id === operations[1]!.id)) throw new SyncError(400, "INVALID_COMMAND", "The server rejected this operation.");
+    const results = commands.map((operation) => {
+      const record = appendOperation(remote.get(operation.definitionId), operation); remote.set(record.id, record); cursor++;
+      return { id: operation.id, disposition: "applied", stamp: operation.stamp, record, cursor };
+    });
+    return { results, watermark: cursor, serverTime: Date.now() };
+  }, "web", () => "UTC", () => {});
+  await engine.run(true);
+  expect((await store.read()).outbox.every((pending) => !pending.error)).toBe(true);
+  await engine.run(true);
+  const state = await store.read();
+  expect(state.outbox[0]!.operation.id).toBe(operations[1]!.id);
+  expect(state.outbox[0]!.error).toContain("rejected");
+  expect(remote.has(first.id)).toBe(true); expect(remote.has(last.id)).toBe(false);
+  await store.transaction((state) => { state.outbox = state.outbox.filter((pending) => pending.operation.definitionId !== blocked.id); });
+  await engine.run(true);
+  expect(remote.has(last.id)).toBe(true); expect((await store.read()).outbox).toHaveLength(0);
+});

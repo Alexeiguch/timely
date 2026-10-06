@@ -94,3 +94,10 @@ export * from "./engine";
 export * from "./planner-actions";
 
 export * from "./preferences";
+export * from "./recovery";
+export * from "./account";
+export * from "./history";
+export * from "./reminders";
+export * from "./local-state";
+
+export * from "./streaks";

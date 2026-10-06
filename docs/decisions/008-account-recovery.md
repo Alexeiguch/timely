@@ -1,0 +1,9 @@
+# Account lifecycle and exceptional-operation recovery
+
+Account deletion uses a confirmed online handler and the actual Better Auth session ID. Inside a transaction it requires an owner-bound unexpired session created within five minutes. Session refresh time is not proof of recent authentication. Deleting the owner cascades planner records, snapshots, queued jobs, installations, provider accounts and all sessions; another account's records remain untouched. Device removal is owner-scoped and serialized with push. Clients pause their sync engine before destructive cleanup, purge their account namespace only after success, and resume if the request fails.
+
+The planner request limiter uses the existing auth rate-limit table with a separate `planner:` key. An atomic PostgreSQL upsert enforces the same per-owner fixed minute across server processes. It replaces the process-local map without adding a provider or credentials.
+
+An invalid atomic batch is retried in singleton order before a command is marked blocked. Settings offers retry with the same operation UUID and confirmed discard of every pending command for that definition. Discarding dependents together avoids leaving edits targeting a discarded offline creation. Other definitions, canonical shadows and logical clocks remain intact. Sign-out offers a separate explicitly confirmed unsynced-discard option; online device/session removal finishes before local purge. Failed sign-out preserves the outbox.
+
+Web actions use the same durable commands as native. State changes, moves and scoped deletes offer an eight-second Undo using newer inverse commands. Keyboard Move and untimed reorder complement week/month date drops; only the period heading recognizes horizontal touch gestures. Validated per-account navigation is restored and reflected in the URL. Linked occurrences are resolved inside the current account; a URL owner value never grants access.

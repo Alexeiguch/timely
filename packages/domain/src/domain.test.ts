@@ -278,3 +278,8 @@ it("jumps to a distant daily window while preserving count and interval", () => 
     ),
   ).toEqual([]);
 });
+it("calendar layout preferences do not create a new reminder identity", () => {
+  const now = instant("2026-09-29", "08:00", "Europe/London");
+  expect(planReminders(item, { ...defaults, firstWeekday: 7, grouped: false }, "Europe/London", now)).toEqual(planReminders(item, defaults, "Europe/London", now));
+  expect(planReminders(item, { ...defaults, beforeMinutes: 15 }, "Europe/London", now)[0]!.version).not.toBe(planReminders(item, defaults, "Europe/London", now)[0]!.version);
+});

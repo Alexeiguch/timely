@@ -3,6 +3,28 @@ on: [push, pull_request]
 jobs:
   checks:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: timely
+          POSTGRES_PASSWORD: timely
+          POSTGRES_DB: timely
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U timely"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+      mailpit:
+        image: axllent/mailpit:v1.29
+        ports: ["1025:1025", "8025:8025"]
+    env:
+      DATABASE_URL: postgres://timely:timely@127.0.0.1:5432/timely
+      DATABASE_MIGRATION_URL: postgres://timely:timely@127.0.0.1:5432/timely
+      BETTER_AUTH_SECRET: synthetic-ci-secret-only-never-use-for-production-2026
+      BETTER_AUTH_URL: http://localhost:3001
+      APP_ENV: local
+      MAIL_MODE: capture
+      TEST_BASE_URL: http://localhost:3001
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -15,5 +37,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
+      - run: pnpm db:migrate
       - run: pnpm test
+        env:
+          RUN_DB_TESTS: "1"
       - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chrome
+      - run: pnpm test:e2e

@@ -41,6 +41,16 @@ export type LocalState = {
     after: number;
     records: Record<string, SyncRecord>;
   } | null;
+  reminders?: {
+    retry: boolean;
+    permission: "granted" | "denied" | "undetermined";
+    mappings: Record<string, { nativeId: string; occurrenceId: string; kind: "before" | "overdue"; version: string; due: number; day: string }>;
+    handled: Record<string, number>;
+    scheduled: number;
+    uncovered: number;
+    horizon: number;
+    reconciledAt: number | null;
+  };
 };
 export function initialState(ownerId: string, deviceId: string): LocalState {
   return {
@@ -206,6 +216,7 @@ export type SyncStatus =
   | "Needs attention";
 export class SyncEngine {
   private running: Promise<void> | null = null;
+  private paused = false;
   constructor(
     private store: LocalStore,
     private transport: Transport,
@@ -214,12 +225,18 @@ export class SyncEngine {
     private status: (value: SyncStatus, message?: string) => void,
   ) {}
   run(force = false, options?: { quiet?: boolean }) {
+    if (this.paused) return Promise.resolve();
     return (this.running ??= this.cycle(force, options?.quiet === true).finally(
       () => {
         this.running = null;
       },
     ));
   }
+  async pause() {
+    this.paused = true;
+    await this.running;
+  }
+  resume() { this.paused = false; }
   private async cycle(force: boolean, quiet: boolean) {
     // Background polls still publish the outcome. They skip the Syncing
     // announcement so the planner does not flash a refresh indicator.
@@ -289,7 +306,9 @@ export class SyncEngine {
         )
           break;
         sent = [];
-        for (const pending of state.outbox.slice(0, 100)) {
+        // A rejected atomic batch is retried one command at a time to isolate the
+        // invalid command without blocking unrelated valid edits permanently.
+        for (const pending of state.outbox.slice(0, state.outbox[0]!.attempts ? 1 : 100)) {
           if (pending.error || (!force && pending.retryAt > Date.now())) break;
           if (
             JSON.stringify({
@@ -389,7 +408,7 @@ export class SyncEngine {
               pending.retryAt =
                 Date.now() +
                 Math.max(known?.retryAfter ?? 0, retryDelay(pending.attempts));
-              if (known && known.status === 400) pending.error = known.message;
+              if (known && known.status === 400 && sent.length === 1) pending.error = known.message;
             }
         });
       this.status(

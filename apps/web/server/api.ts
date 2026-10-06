@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { auth } from "@timely/auth/server";
 import { CommandError } from "@timely/sync";
+import { allowPlannerRequest } from "@timely/db/account";
 
 export class ApiError extends Error {
   constructor(
@@ -35,10 +36,9 @@ export async function readBody(request: Request): Promise<unknown> {
     throw new ApiError("INVALID_COMMAND", 400, "Send valid JSON.");
   }
 }
-const windows = new Map<string, { start: number; count: number }>();
 export async function authenticated(
   request: Request,
-  handler: (ownerId: string) => Promise<unknown>,
+  handler: (ownerId: string, sessionId: string) => Promise<unknown>,
 ) {
   const requestId = randomUUID();
   try {
@@ -65,16 +65,9 @@ export async function authenticated(
         403,
         "Sign in to the account that owns these local changes.",
       );
-    const now = Date.now();
-    if (windows.size > 10000)
-      for (const [key, window] of windows)
-        if (window.start < now - 60000) windows.delete(key);
-    const window = windows.get(session.user.id);
-    if (!window || now - window.start >= 60000)
-      windows.set(session.user.id, { start: now, count: 1 });
-    else if (++window.count > 180)
+    if (!(await allowPlannerRequest(session.user.id)))
       throw new ApiError("RATE_LIMITED", 429, "Please retry shortly.");
-    const result = await handler(session.user.id);
+    const result = await handler(session.user.id, session.session.id);
     return Response.json(result, {
       headers: { "Cache-Control": "no-store", "X-Request-ID": requestId },
     });

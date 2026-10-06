@@ -1,0 +1,10 @@
+# Indexed canonical records and pending operations
+
+The initial account-wide IndexedDB/SQLite JSON aggregate is migrated transactionally into account metadata, canonical shadow records and pending-operation tables. IndexedDB retains its database name and upgrades from version 1 to 2. SQLite retains `timely-planner.db` and upgrades to `user_version = 3`, converting each legacy account row before setting the version. Metadata preserves the device UUID, logical clock, cursor, bootstrap staging, last sync and reminder reconciliation state. Outbox UUIDs, retry metadata and dependency order are preserved exactly.
+
+All reads validate the shared stored-state schema and expected account. Malformed or unsupported state is retained and reported; migration never silently replaces it with a fresh account. Mutations validate and write metadata plus changed entity/outbox rows in one transaction. Outbox indexes cover account/position, definition and retry time. Account purge deletes only that namespace's records. A separate durable native notification cleanup table survives account purge and retries interrupted OS cancellation on launch.
+
+Clients still expose a full-account repository read to the current UI. Indexed scheduled-date projections and journal checkpoints are separate remaining scale work, not claimed complete here. Browser upgrade verification must preserve a real queued offline creation through restart and reconnect. SQLite migration requires equivalent native runtime verification before release; successful TypeScript/Hermes checks alone do not establish it.
+
+
+The shared native persistence/migration functions are exercised with actual SQLite in Node: queued-work upgrade and file reopen, two-account isolation, interrupted writes/rollback and refusal of malformed/future schemas pass. This is SQL/transaction evidence; the Expo SDK and device runtime gate remains separate. Both adapters compare encoded records when deciding writes, so valid in-place transactional changes are retained as well as immutable replacements.

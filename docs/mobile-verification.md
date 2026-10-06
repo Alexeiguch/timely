@@ -48,3 +48,14 @@ The checked-in Maestro flow remains unexecuted; the above evidence comes from ac
 Final signed simulator build log: `/tmp/timely-tabbar-final-build.log`. All four tab destinations work, using the standard navigator with a rounded inset bar and compact active icon pill. Evidence: `evidence/mobile-tabbar-ios.png`.
 
 Sunday-first weeks and month grouping now synchronize with the web client. Verified real account bootstrap, changes in both directions, an API-disconnected grouping edit, process restart with the queued edit intact, and automatic reconnect to zero pending. Existing weekly recurrence rules are untouched. This does not close the remaining Android, large-text, gesture or physical-device gates.
+
+
+## 2026-10-05 — final supported dependency compilation and SQLite logic
+
+Expo 57 / RN 0.86.3 now pins Worklets 0.10.1, Reanimated 4.5.1 and Metro config 0.86.3. Frozen install and Expo Doctor 21/21 pass. Both final Hermes exports pass at `/tmp/timely-supported-final-export`.
+
+Signed ARM64 iOS simulator Release build succeeds; artifact `/tmp/timely-supported-ios/Build/Products/Release-iphonesimulator/Timelydevelopment.app`, log `/tmp/timely-supported-ios.log`. Android Debug build succeeds in 18m 25s; artifact `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`, log `/tmp/timely-supported-android.log`. It uses Metro in development; configure the emulator-reachable API as described above. These are local development artifacts, not signed store releases.
+
+Three actual Node SQLite tests exercise the same persistence/migration SQL used by the native adapter: pending-work migration and file reopen, two-owner isolation, atomic crash rollback, and refusal to overwrite malformed/newer schemas. Native API transaction/OS behavior still requires device runtime evidence.
+
+Simulator UI automation stalled; no new native sign-in, migration, account cleanup or notification presentation pass is claimed. Local scheduling/cancellation and reminder-default UI are implemented and deterministic recovery checks pass, but real-device permission/terminated/offline/zone delivery and remote push/provider gates remain open. Remote push is not enabled. The earlier manual simulator evidence remains scoped to its original milestone.

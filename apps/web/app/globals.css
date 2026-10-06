@@ -398,6 +398,7 @@ a {
   overflow-wrap: anywhere;
 }
 .planner-main {
+  min-width: 0;
   max-width: 1250px;
   width: 100%;
   padding: 48px 56px 80px;
@@ -535,6 +536,7 @@ a {
 }
 .task-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 .task-card {
@@ -733,6 +735,7 @@ a {
 .series-card,
 .review-card,
 .settings-card {
+  min-width: 0;
   padding: 24px;
   background: white;
   border: 1px solid #e5e7df;
@@ -837,6 +840,32 @@ a {
 }
 .settings-card > h2:not(:first-child) {
   margin-top: 32px;
+}
+.reminder-settings {
+  display: grid;
+  gap: 16px;
+}
+.reminder-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  font-weight: 500;
+}
+.reminder-checkbox-row input[type="checkbox"] {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.reminder-checkbox-row label {
+  display: block;
+  font-weight: inherit;
+  cursor: pointer;
 }
 .settings-card dl {
   display: grid;
@@ -1158,3 +1187,21 @@ a {
   .editor h2 { font-size: 24px; }
 }
 .provider-availability { font-size: 14px; color: var(--muted); }
+.undo-notice { position: fixed; bottom: 96px; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; align-items: center; gap: 16px; padding: 12px 20px; max-width: calc(100vw - 32px); border-radius: 18px; background: #E9FF72; color: #14294D; box-shadow: 0 8px 24px #14294d22; }
+.action-dialog { max-width: 480px; }
+.action-dialog form { display: grid; gap: 16px; }
+
+.streak-indicator { margin: 12px 0; padding: 12px 14px; border-radius: 16px; background: #FFF0E2; color: var(--text); }
+.streak-indicator.ended { background: #F0EFE5; }
+.streak-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.streak-flame { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: #FFBC80; }
+.ended .streak-flame { background: #E2E6DE; color: #667389; }
+.streak-caption { font-size: 12px; color: #667389; }
+.streak-marks { display: flex; gap: 6px; margin: 9px 0 7px; }
+.streak-mark { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid #A9B3C2; }
+.streak-mark.completed { background: #E9FF72; border-color: #14294D; }
+.streak-mark.missed { background: #FFBC80; border-color: #9F3525; color: #9F3525; }
+.streak-mark.empty { opacity: .25; }
+.streak-indicator small { display: block; line-height: 1.5; }
+.streak-setting { background: #FFF0E2; border-color: #FFBC80; }
+.streak-setting input[type="checkbox"] { width: 20px; height: 20px; accent-color: #1A5FCF; }

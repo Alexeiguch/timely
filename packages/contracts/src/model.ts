@@ -112,14 +112,24 @@ export const contentSchema = z
     priority: z.enum(["low", "medium", "high"]).nullable(),
   })
   .strict();
-export const taskSchema = contentSchema
+// Optional for existing journals: absence and null both mean tracking is off.
+export const streakPolicySchema = z
+  .object({ from: civilDate })
+  .strict()
+  .nullable();
+export const taskFieldsSchema = contentSchema
   .extend({
     id,
     schedule: scheduleSchema,
     reminders: reminderPolicySchema,
     rule: ruleSchema.nullable(),
+    streak: streakPolicySchema.optional(),
   })
   .strict();
+export const taskSchema = taskFieldsSchema.refine(
+  (task) => !task.streak || !!task.rule,
+  "Streaks require a repeating task",
+);
 export type Task = z.infer<typeof taskSchema>;
 export const preferencesSchema = z
   .object({
