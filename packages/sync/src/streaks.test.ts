@@ -229,3 +229,151 @@ it("keeps legacy journal shapes unchanged for dedupe fingerprints", () => {
       ),
   ).toBe(false);
 });
+
+it("replays an accepted Skip when a delayed earlier streak edit arrives from another device", () => {
+  const deviceA = randomUUID(),
+    deviceB = randomUUID();
+  const plain = appendOperation(
+    undefined,
+    operation(
+      { type: "create", task: { ...task, streak: null } },
+      1000,
+      deviceA,
+    ),
+  );
+  const old = items(plain)[0]!;
+  const terminal = setState(
+    old,
+    "skipped",
+    "UTC",
+    Date.parse("2026-10-01T12:00Z"),
+  ).terminal;
+  const skip = operation(
+    {
+      type: "state",
+      target: occurrenceTarget(old),
+      state: "skipped",
+      terminal,
+    },
+    3000,
+    deviceB,
+  );
+  const accepted = appendOperation(plain, skip);
+  const enable = operation(
+    {
+      type: "edit",
+      target: occurrenceTarget(old),
+      scope: "future",
+      currentDay: "2026-10-01",
+      patch: { streak: task.streak },
+    },
+    2000,
+    deviceA,
+  );
+  const merged = appendOperation(accepted, enable);
+  const historical = items(merged).find((item) => item.id === old.id)!;
+  expect(historical).toMatchObject({
+    state: "skipped",
+    terminal,
+    streak: null,
+  });
+  expect(items(merged)[1]!.streak).toEqual(task.streak);
+  expect(appendOperation(merged, skip)).toBe(merged); // Acknowledged UUID retry remains valid.
+  expect(
+    reduceRecord({ ...merged, operations: [...merged.operations].reverse() }),
+  ).toEqual(reduceRecord(merged));
+  expect(
+    streakSummaries([merged], "UTC", Date.parse("2026-10-02T10:00Z")).get(
+      streakKey(items(merged)[1]!),
+    )?.ended,
+  ).toBe(false);
+  const local = initialState("owner-one", deviceA);
+  local.shadows[task.id] = accepted;
+  local.outbox = [{ operation: enable, attempts: 0, retryAt: 0 }];
+  const visible = visibleRecords(local);
+  expect(visible.errors).toEqual([]);
+  expect(reduceRecord(visible.records[0]!)).toEqual(reduceRecord(merged));
+});
+
+it("rejects a new backdated Skip against an already enabled series", () => {
+  const plain = appendOperation(
+    undefined,
+    operation({ type: "create", task: { ...task, streak: null } }, 1000),
+  );
+  const old = items(plain)[0]!;
+  const enabled = appendOperation(
+    plain,
+    operation(
+      {
+        type: "edit",
+        target: occurrenceTarget(old),
+        scope: "future",
+        currentDay: "2026-10-01",
+        patch: { streak: task.streak },
+      },
+      2000,
+    ),
+  );
+  const terminal = setState(
+    old,
+    "skipped",
+    "UTC",
+    Date.parse("2026-10-01T12:00Z"),
+  ).terminal;
+  expect(() =>
+    appendOperation(
+      enabled,
+      operation(
+        {
+          type: "state",
+          target: occurrenceTarget(old),
+          state: "skipped",
+          terminal,
+        },
+        1500,
+      ),
+    ),
+  ).toThrow("cannot be skipped");
+});
+
+it.each(["completed", "skipped"] as const)(
+  "preserves absent legacy streak policy on accepted %s history after a delayed edit",
+  (state) => {
+    const { streak: _, ...legacy } = task;
+    const plain = appendOperation(
+      undefined,
+      operation({ type: "create", task: legacy }, 1000),
+    );
+    const old = items(plain)[0]!;
+    const terminal = setState(
+      old,
+      state,
+      "UTC",
+      Date.parse("2026-10-01T12:00Z"),
+    ).terminal;
+    const accepted = appendOperation(
+      plain,
+      operation(
+        { type: "state", target: occurrenceTarget(old), state, terminal },
+        3000,
+      ),
+    );
+    const merged = appendOperation(
+      accepted,
+      operation(
+        {
+          type: "edit",
+          target: occurrenceTarget(old),
+          scope: "future",
+          currentDay: "2026-10-01",
+          patch: { streak: task.streak },
+        },
+        2000,
+      ),
+    );
+    const historical = items(merged).find((item) => item.id === old.id)!;
+    expect(historical).toMatchObject({ state, terminal });
+    expect("streak" in historical).toBe(false);
+    expect(items(merged)[1]!.streak).toEqual(task.streak);
+  },
+);

@@ -149,24 +149,21 @@ export function reduceRecord(record: TaskRecord): Series {
         series = { ...series, deleted: false, deletedFrom: null };
       else series = saveException(series, { ...selected, deleted: false });
     } else if (command.type === "state") {
-      const active = series.active.find(
-        (segment) =>
-          segment.from <= selected.originalDate &&
-          (!segment.through || segment.through >= selected.originalDate),
-      );
-      const current = series.revisions.find(
-        (revision) => revision.id === active?.revisionId,
-      )?.task;
-      if ((selected.streak || current?.streak) && command.state === "skipped")
-        throw new CommandError(
-          "INVALID_COMMAND",
-          "Streak tasks cannot be skipped.",
-        );
-      series = saveException(series, {
+      const value = {
         ...selected,
         state: command.state,
         terminal: command.terminal,
-      });
+      };
+      if (command.state !== "pending") {
+        // Terminal history retains the policy of the immutable authored revision.
+        // A delayed earlier edit must not turn an accepted plain Skip into a streak miss.
+        const policy = series.revisions.find(
+          (revision) => revision.id === command.target.revisionId,
+        )!.task.streak;
+        if (policy === undefined) delete value.streak;
+        else value.streak = policy;
+      }
+      series = saveException(series, value);
     } else if (command.type === "order") {
       series = saveException(series, { ...selected, order: command.order });
     } else if (command.scope === "occurrence") {
@@ -216,6 +213,29 @@ export function appendOperation(
     throw new CommandError("INVALID_COMMAND", "Mismatched task identity.");
   const existing = record?.operations.find((o) => o.id === operation.id);
   if (existing) return record!;
+  if (
+    record &&
+    operation.command.type === "state" &&
+    operation.command.state === "skipped"
+  ) {
+    // Validate new commands against the current record, independently of their HLC.
+    // Accepted operations remain replayable, including exact retries after edits.
+    const series = reduceRecord(record);
+    const selected = resolveTarget(series, operation.command.target);
+    const active = series.active.find(
+      (segment) =>
+        segment.from <= selected.originalDate &&
+        (!segment.through || segment.through >= selected.originalDate),
+    );
+    const current = series.revisions.find(
+      (revision) => revision.id === active?.revisionId,
+    )?.task;
+    if (selected.streak || current?.streak)
+      throw new CommandError(
+        "INVALID_COMMAND",
+        "Streak tasks cannot be skipped.",
+      );
+  }
   const next = {
     id: operation.definitionId,
     operations: [...(record?.operations ?? []), operation],

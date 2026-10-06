@@ -107,6 +107,123 @@ describe.skipIf(!enabled)(
       const historical = await historyRepository(db!).page(owners[0]!, { from: "2026-10-01", through: "2026-10-02", zone: "Europe/London", definitionId: task.id });
       expect(historical.items[0]!.streak).toEqual(task.streak);
     });
+    it("accepts a delayed streak edit after another device's Skip without rewriting history", async () => {
+      const ownerId = owners[0]!;
+      const secondDevice = randomUUID();
+      await api!.register(ownerId, {
+        id: secondDevice,
+        platform: "ios",
+        zone: "UTC",
+        protocolVersion: 1,
+      });
+      const task = taskSchema.parse({
+        id: randomUUID(),
+        title: "Delayed streak fixture",
+        notes: "",
+        priority: null,
+        schedule: { date: "2026-10-01", time: null, duration: null },
+        reminders: { enabled: false, before: true, overdue: true },
+        streak: null,
+        rule: {
+          frequency: "daily",
+          anchor: "2026-10-01",
+          interval: 1,
+          invalidDate: "clamp",
+          end: { kind: "never" },
+        },
+      });
+      const now = Date.now();
+      const created = await push(ownerId, [
+        op(task.id, { type: "create", task }, now - 3000),
+      ]);
+      const item = projectSeries(
+        reduceRecord(recordSchema.parse(created.results[0]!.record)),
+        "2026-10-01",
+        "2026-10-01",
+      )[0]!;
+      const terminal = setState(
+        item,
+        "skipped",
+        "UTC",
+        Date.parse("2026-10-01T12:00Z"),
+      ).terminal;
+      const authoredSkip = op(
+        task.id,
+        {
+          type: "state",
+          target: occurrenceTarget(item),
+          state: "skipped",
+          terminal,
+        },
+        now - 1000,
+      );
+      const skip = {
+        ...authoredSkip,
+        deviceId: secondDevice,
+        stamp: { ...authoredSkip.stamp, deviceId: secondDevice },
+      };
+      const secondPush = (operation: Operation) =>
+        api!.push(ownerId, {
+          protocolVersion: 1,
+          deviceId: secondDevice,
+          operations: [operation],
+        });
+      const accepted = await secondPush(skip);
+      const policy = { from: "2026-10-01" };
+      const merged = await push(ownerId, [
+        op(
+          task.id,
+          {
+            type: "edit",
+            target: occurrenceTarget(item),
+            scope: "future",
+            currentDay: "2026-10-01",
+            patch: { streak: policy },
+          },
+          now - 2000,
+        ),
+      ]);
+      const series = reduceRecord(
+        recordSchema.parse(merged.results[0]!.record),
+      );
+      expect(
+        projectSeries(series, "2026-10-01", "2026-10-01")[0],
+      ).toMatchObject({
+        id: item.id,
+        state: "skipped",
+        terminal,
+        streak: null,
+      });
+      expect(
+        projectSeries(series, "2026-10-02", "2026-10-02")[0]!.streak,
+      ).toEqual(policy);
+      expect((await secondPush(skip)).results).toEqual(accepted.results);
+      const historical = await historyRepository(db!).page(ownerId, {
+        from: "2026-10-01",
+        through: "2026-10-02",
+        zone: "UTC",
+        definitionId: task.id,
+      });
+      expect(
+        historical.items.find((entry) => entry.id === item.id),
+      ).toMatchObject({ state: "skipped", terminal, streak: null });
+      await expect(
+        push(ownerId, [
+          op(
+            task.id,
+            {
+              type: "state",
+              target: occurrenceTarget(item),
+              state: "skipped",
+              terminal,
+            },
+            now - 2500,
+          ),
+        ]),
+      ).rejects.toThrow("cannot be skipped");
+      expect((await api!.pull(ownerId, merged.watermark)).changes).toEqual([]);
+      await accountRepository(db!).unregister(ownerId, secondDevice);
+    });
     it("requires an owner-bound fresh session for deletion and cascades only that account", async () => {
       const ownerId = randomUUID(); owners.push(ownerId);
       await db!.insert(user).values({ id: ownerId, name: "Deletion fixture", email: `${ownerId}@example.test`, emailVerified: true });
