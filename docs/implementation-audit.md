@@ -1,5 +1,13 @@
 # Implementation audit — current continuation 5–6 October 2026
 
+## Security and document pass — 8 October 2026
+
+Owner-scoped sync, history, devices, account deletion and notification mutations still take the owner from the server session. The public notification config returns only enabled/project identity. The service worker still caches only the public shell and same-origin static assets. This pass fixed four gaps: web responses now send anti-framing and nosniff headers; a production Node process will not enable Expo push without `EXPO_ACCESS_TOKEN`; a signing key disables unsigned Inngest dev mode, and unsigned mode accepts only a loopback Host; native Apple sign-in sends the SHA-256 nonce to Apple and the raw nonce to Better Auth. Preview and production mobile builds reject a cleartext API address. Development still allows loopback, `10.0.2.2` and `.local`.
+
+`initial.md` and `planner-agent-pack/` were removed. They contradicted the maintained Spanish, streak and mobile-layout contracts in `docs/planner/`. Historical ADRs stay as records of their original decisions. [ADR 001](decisions/001-foundation.md) points at the later native SDK decisions.
+
+The October 5 notes below still describe that day's tree. Where they say notification resources or Inngest are missing, [ADR 014](decisions/014-expo-remote-reminders.md) and the current code supersede that statement. The owner subsequently observed a synthetic Expo remote notification on the development iPhone; full task/device-state delivery acceptance and hosted worker operation remain unverified. No stage is complete.
+
 
 ## Streak extension — 6 October 2026
 

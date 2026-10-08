@@ -1,11 +1,19 @@
 "use client";
+import { t, locale } from "@timely/i18n";
+import { useLanguage } from "../components/language-state";
+
 import { useEffect, useState } from "react";
 import { authClient } from "@timely/auth/client";
 import { SignIn } from "../components/sign-in";
 import { Planner } from "../components/planner";
-type Identity = { id: string; email: string; name: string };
+type Identity = {
+  id: string;
+  email: string;
+  name: string;
+};
 const cacheKey = "timely-local-account";
 export default function Home() {
+  useLanguage();
   const { data: session, isPending } = authClient.useSession();
   const [cached, setCached] = useState<Identity | null>(null);
   const [ready, setReady] = useState(false);
@@ -62,7 +70,7 @@ export default function Home() {
   if (!ready || (isPending && !identity))
     return (
       <main className="signin">
-        <p role="status">Opening your day…</p>
+        <p role="status">{t("Opening your day\u2026")}</p>
       </main>
     );
   if (!identity || signingIn)
@@ -74,7 +82,7 @@ export default function Home() {
             className="return-planner"
             onClick={() => setSigningIn(false)}
           >
-            Back to saved plans
+            {t("Back to saved plans")}
           </button>
         )}
       </>

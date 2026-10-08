@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+test.beforeEach(async ({ context }) => { await context.addInitScript(() => localStorage.setItem("timely-language", "en")); });
 
 test("serves browser icons and advertises only configured social providers", async ({
   page,

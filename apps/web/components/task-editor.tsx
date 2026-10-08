@@ -1,4 +1,7 @@
 "use client";
+import { t, locale, errorMessage, recurrenceText } from "@timely/i18n";
+import { useLanguage } from "./language-state";
+
 import { useEffect, useRef, useState } from "react";
 import {
   taskSchema,
@@ -6,7 +9,7 @@ import {
   type Rule,
   type Occurrence,
 } from "@timely/contracts";
-import { date, preview, ruleSummary, recurrencePreset } from "@timely/domain";
+import { date, preview, recurrencePreset } from "@timely/domain";
 type Props = {
   initial: Task;
   currentDay: string;
@@ -24,6 +27,7 @@ export function TaskEditor({
   onSave,
   onClose,
 }: Props) {
+  useLanguage();
   const dialog = useRef<HTMLDialogElement>(null);
   const [task, setTask] = useState(initial);
   const [scope, setScope] = useState<"occurrence" | "future" | "series">(
@@ -75,9 +79,7 @@ export function TaskEditor({
           setError("");
           const parsed = taskSchema.safeParse(task);
           if (!parsed.success) {
-            setError(
-              parsed.error.issues[0]?.message ?? "Check the task fields.",
-            );
+            setError(t("Check the task fields."));
             setSaving(false);
             return;
           }
@@ -85,7 +87,7 @@ export function TaskEditor({
             await onSave(parsed.data, scope);
             onClose();
           } catch (e) {
-            setError(e instanceof Error ? e.message : "Unable to save.");
+            setError(e instanceof Error ? e.message : t("Unable to save."));
           } finally {
             setSaving(false);
           }
@@ -93,26 +95,30 @@ export function TaskEditor({
       >
         <header className="row between">
           <h2 id="editor-title">
-            {occurrence ? "A little adjustment" : "Make a little plan"}
+            {occurrence ? t("A little adjustment") : t("Make a little plan")}
           </h2>
-          <button type="button" aria-label="Close editor" onClick={onClose}>
+          <button
+            type="button"
+            aria-label={t("Close editor")}
+            onClick={onClose}
+          >
             ×
           </button>
         </header>
         <label>
-          Task title
+          {t("Task title")}
           <input
             autoFocus
             value={task.title}
             maxLength={200}
             required
             onChange={(e) => patch({ title: e.target.value })}
-            placeholder="What would you like to do?"
+            placeholder={t("What would you like to do?")}
           />
         </label>
         <div className="form-grid">
           <label>
-            Date
+            {t("Date")}
             <input
               type="date"
               min="1900-01-01"
@@ -125,7 +131,8 @@ export function TaskEditor({
             />
           </label>
           <label>
-            Start time <small>Optional</small>
+            {t("Start time")}
+            <small>{t("Optional")}</small>
             <input
               type="time"
               value={task.schedule.time ?? ""}
@@ -137,7 +144,7 @@ export function TaskEditor({
             />
           </label>
           <label>
-            Duration in minutes
+            {t("Duration in minutes")}
             <input
               type="number"
               min="1"
@@ -154,7 +161,7 @@ export function TaskEditor({
             />
           </label>
           <label>
-            Priority
+            {t("Priority")}
             <select
               value={task.priority ?? ""}
               onChange={(e) =>
@@ -163,15 +170,15 @@ export function TaskEditor({
                 })
               }
             >
-              <option value="">No priority</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
+              <option value="">{t("No priority")}</option>
+              <option value="low">{t("Low")}</option>
+              <option value="medium">{t("Medium")}</option>
+              <option value="high">{t("High")}</option>
             </select>
           </label>
         </div>
         <label>
-          Notes
+          {t("Notes")}
           <textarea
             value={task.notes}
             maxLength={10000}
@@ -181,37 +188,37 @@ export function TaskEditor({
         </label>
         {occurrence && initial.rule && (
           <label>
-            Apply changes to
+            {t("Apply changes to")}
             <select
               value={scope}
               onChange={(e) => setScope(e.target.value as typeof scope)}
             >
-              <option value="occurrence">Only this occurrence</option>
-              <option value="future">This and future occurrences</option>
-              <option value="series">Whole series from today</option>
+              <option value="occurrence">{t("Only this occurrence")}</option>
+              <option value="future">{t("This and future occurrences")}</option>
+              <option value="series">{t("Whole series from today")}</option>
             </select>
           </label>
         )}
         <fieldset disabled={!ruleEditable}>
-          <legend>Repeat</legend>
+          <legend>{t("Repeat")}</legend>
           <label>
-            Frequency
+            {t("Frequency")}
             <select
               value={task.rule?.frequency ?? "none"}
               onChange={(e) => frequency(e.target.value)}
             >
-              <option value="none">Does not repeat</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="yearly">Yearly</option>
+              <option value="none">{t("Does not repeat")}</option>
+              <option value="daily">{t("Daily")}</option>
+              <option value="weekly">{t("Weekly")}</option>
+              <option value="monthly">{t("Monthly")}</option>
+              <option value="yearly">{t("Yearly")}</option>
             </select>
           </label>
           {task.rule && (
             <>
               <div className="form-grid">
                 <label>
-                  Every
+                  {t("Every")}
                   <input
                     type="number"
                     min="1"
@@ -223,7 +230,7 @@ export function TaskEditor({
                   />
                 </label>
                 <label>
-                  Starts on
+                  {t("Starts on")}
                   <input
                     type="date"
                     value={task.rule.anchor}
@@ -234,7 +241,7 @@ export function TaskEditor({
                 </label>
               </div>
               {task.rule.frequency === "weekly" && (
-                <div className="chips" aria-label="Repeat weekdays">
+                <div className="chips" aria-label={t("Repeat weekdays")}>
                   {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
                     (label, i) => {
                       const rule = task.rule;
@@ -253,7 +260,7 @@ export function TaskEditor({
                             })
                           }
                         >
-                          {label}
+                          {t(label)}
                         </button>
                       );
                     },
@@ -265,7 +272,7 @@ export function TaskEditor({
                 <>
                   {task.rule.frequency === "yearly" && (
                     <label>
-                      Month
+                      {t("Month")}
                       <input
                         type="number"
                         min="1"
@@ -278,7 +285,7 @@ export function TaskEditor({
                     </label>
                   )}
                   <label>
-                    On
+                    {t("On")}
                     <select
                       value={task.rule.selector.kind}
                       onChange={(e) =>
@@ -299,14 +306,16 @@ export function TaskEditor({
                         })
                       }
                     >
-                      <option value="days">Selected days of the month</option>
-                      <option value="ordinal">A weekday pattern</option>
-                      <option value="last-day">The last day</option>
+                      <option value="days">
+                        {t("Selected days of the month")}
+                      </option>
+                      <option value="ordinal">{t("A weekday pattern")}</option>
+                      <option value="last-day">{t("The last day")}</option>
                     </select>
                   </label>
                   {task.rule.selector.kind === "days" && (
                     <label>
-                      Days, separated by commas
+                      {t("Days, separated by commas")}
                       <input
                         value={task.rule.selector.days.join(",")}
                         onChange={(e) =>
@@ -323,7 +332,7 @@ export function TaskEditor({
                   {task.rule.selector.kind === "ordinal" && (
                     <div className="form-grid">
                       <label>
-                        Position
+                        {t("Position")}
                         <select
                           value={task.rule.selector.ordinal}
                           onChange={(e) => {
@@ -342,15 +351,15 @@ export function TaskEditor({
                               });
                           }}
                         >
-                          <option value="1">First</option>
-                          <option value="2">Second</option>
-                          <option value="3">Third</option>
-                          <option value="4">Fourth</option>
-                          <option value="-1">Last</option>
+                          <option value="1">{t("First")}</option>
+                          <option value="2">{t("Second")}</option>
+                          <option value="3">{t("Third")}</option>
+                          <option value="4">{t("Fourth")}</option>
+                          <option value="-1">{t("Last")}</option>
                         </select>
                       </label>
                       <label>
-                        Weekday
+                        {t("Weekday")}
                         <select
                           value={task.rule.selector.weekday}
                           onChange={(e) => {
@@ -371,7 +380,9 @@ export function TaskEditor({
                               });
                           }}
                         >
-                          <option value="weekday">Weekday (Mon–Fri)</option>
+                          <option value="weekday">
+                            {t("Weekday (Mon\u2013Fri)")}
+                          </option>
                           {[
                             "Monday",
                             "Tuesday",
@@ -382,7 +393,7 @@ export function TaskEditor({
                             "Sunday",
                           ].map((label, i) => (
                             <option key={label} value={i + 1}>
-                              {label}
+                              {t(label)}
                             </option>
                           ))}
                         </select>
@@ -390,7 +401,7 @@ export function TaskEditor({
                     </div>
                   )}
                   <label>
-                    Dates missing from shorter months
+                    {t("Dates missing from shorter months")}
                     <select
                       value={task.rule.invalidDate}
                       onChange={(e) =>
@@ -399,14 +410,16 @@ export function TaskEditor({
                         })
                       }
                     >
-                      <option value="clamp">Use the last available day</option>
-                      <option value="skip">Skip that month</option>
+                      <option value="clamp">
+                        {t("Use the last available day")}
+                      </option>
+                      <option value="skip">{t("Skip that month")}</option>
                     </select>
                   </label>
                 </>
               )}
               <label>
-                Ends
+                {t("Ends")}
                 <select
                   value={task.rule.end.kind}
                   onChange={(e) =>
@@ -420,14 +433,16 @@ export function TaskEditor({
                     })
                   }
                 >
-                  <option value="never">Never</option>
-                  <option value="count">After a number of occurrences</option>
-                  <option value="date">On a date</option>
+                  <option value="never">{t("Never")}</option>
+                  <option value="count">
+                    {t("After a number of occurrences")}
+                  </option>
+                  <option value="date">{t("On a date")}</option>
                 </select>
               </label>
               {task.rule.end.kind === "count" && (
                 <label>
-                  Number of occurrences
+                  {t("Number of occurrences")}
                   <input
                     type="number"
                     min="1"
@@ -443,7 +458,7 @@ export function TaskEditor({
               )}
               {task.rule.end.kind === "date" && (
                 <label>
-                  End date
+                  {t("End date")}
                   <input
                     type="date"
                     value={task.rule.end.date}
@@ -454,11 +469,13 @@ export function TaskEditor({
                 </label>
               )}
               <p className="rule-preview">
-                {ruleSummary(task.rule)}
+                {recurrenceText(task.rule)}
                 <br />
                 <small>
-                  Next dates:{" "}
-                  {nextDates.join(" · ") || "Check your repeat settings."}
+                  {t("Next dates: {v0}", {
+                    v0:
+                      nextDates.join(" · ") || t("Check your repeat settings."),
+                  })}
                 </small>
               </p>
             </>
@@ -478,31 +495,34 @@ export function TaskEditor({
                   })
                 }
               />
-              Track a streak
+              {t("Track a streak")}
             </label>
             <p className="muted">
-              Complete each occurrence before its deadline to keep your streak.
-              Skipping is unavailable. Untimed tasks are due at the end of the
-              day; timed tasks are due at their time plus duration.
+              {t(
+                "Complete each occurrence before its deadline to keep your streak. Skipping is unavailable. Untimed tasks are due at the end of the day; timed tasks are due at their time plus duration.",
+              )}
             </p>
             {!!occurrence && !ruleEditable && (
               <p className="muted">
-                Choose a future or series scope to change streak tracking.
+                {t(
+                  "Choose a future or series scope to change streak tracking.",
+                )}
               </p>
             )}
           </fieldset>
         )}
         <p className="muted">
-          Notification delivery is still being connected. Your task and repeat
-          settings are saved now.
+          {t(
+            "Notification delivery is still being connected. Your task and repeat settings are saved now.",
+          )}
         </p>
-        {error && <p role="alert">{error}</p>}
+        {error && <p role="alert">{errorMessage(error)}</p>}
         <footer className="row">
           <button className="primary" disabled={saving}>
-            {saving ? "Saving…" : "Save task"}
+            {saving ? t("Saving\u2026") : t("Save task")}
           </button>
           <button type="button" onClick={onClose}>
-            Cancel
+            {t("Cancel")}
           </button>
         </footer>
       </form>

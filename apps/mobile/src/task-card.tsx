@@ -1,3 +1,5 @@
+import { t, locale } from "@timely/i18n";
+import { useLanguage } from "./language-state";
 import { useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { Check, MoreHorizontal, Repeat2 } from "lucide-react-native";
@@ -16,6 +18,7 @@ export function TaskCard({
   item: Occurrence;
   showDate?: boolean;
 }) {
+  useLanguage();
   const planner = usePlanner();
   const [menu, setMenu] = useState(false);
   const [moveDate, setMoveDate] = useState(item.schedule.date);
@@ -30,19 +33,23 @@ export function TaskCard({
   const remove = (scope: Scope) =>
     Alert.alert(
       scope === "series"
-        ? "Delete the entire series?"
+        ? t("Delete the entire series?")
         : scope === "future"
-          ? "Delete this and all future occurrences?"
-          : "Delete this occurrence?",
+          ? t("Delete this and all future occurrences?")
+          : t("Delete this occurrence?"),
       scope === "series"
-        ? "This removes all its planner history. You can undo immediately after deleting."
+        ? t(
+            "This removes all its planner history. You can undo immediately after deleting.",
+          )
         : scope === "future"
-          ? "Earlier occurrences remain. You can undo immediately after deleting."
-          : "Other recurring dates stay unchanged.",
+          ? t(
+              "Earlier occurrences remain. You can undo immediately after deleting.",
+            )
+          : t("Other recurring dates stay unchanged."),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("Cancel"), style: "cancel" },
         {
-          text: "Delete",
+          text: t("Delete"),
           style: "destructive",
           onPress: () =>
             planner.act(async () => {
@@ -60,7 +67,7 @@ export function TaskCard({
         <Pressable
           accessibilityRole="checkbox"
           accessibilityState={{ checked: item.state === "completed" }}
-          accessibilityLabel={`${item.state === "completed" ? "Reopen" : "Complete"} ${item.title}`}
+          accessibilityLabel={`${item.state === "completed" ? t("Reopen") : t("Complete")} ${item.title}`}
           onPress={() =>
             planner.act(() =>
               planner.changeState(
@@ -85,8 +92,10 @@ export function TaskCard({
         <View style={s.grow}>
           <Text style={s.muted}>
             {showDate ? `${item.schedule.date} · ` : ""}
-            {item.schedule.time ?? "Any time"}
-            {item.schedule.duration ? ` · ${item.schedule.duration} min` : ""}
+            {item.schedule.time ?? t("Any time")}
+            {item.schedule.duration
+              ? t(" \u00B7 {v0} min", { v0: item.schedule.duration })
+              : ""}
           </Text>
           <Text
             style={[
@@ -99,7 +108,7 @@ export function TaskCard({
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Actions for ${item.title}`}
+          accessibilityLabel={t("Actions for {v0}", { v0: item.title })}
           style={styles.menu}
           onPress={() => {
             setMoveDate(item.schedule.date);
@@ -115,18 +124,18 @@ export function TaskCard({
         {recurring && <Repeat2 size={18} color={colors.muted} />}
         {item.priority && (
           <Text style={[s.label, styles.priority]}>
-            {item.priority[0]!.toUpperCase() + item.priority.slice(1)} priority
+            {t("{v0} priority", { v0: t(item.priority) })}
           </Text>
         )}
         {derived !== "upcoming" && (
           <Text style={[s.label, derived === "overdue" && styles.overdueLabel]}>
             {derived === "overdue"
-              ? "Overdue"
+              ? t("Overdue")
               : derived === "completed"
-                ? "Completed"
+                ? t("Completed")
                 : derived === "skipped"
-                  ? "Skipped"
-                  : "In progress"}
+                  ? t("Skipped")
+                  : t("In progress")}
           </Text>
         )}
       </View>
@@ -137,24 +146,26 @@ export function TaskCard({
         </Text>
       )}
       {item.schedule.date !== item.originalDate && (
-        <Text style={s.muted}>Originally {item.originalDate}</Text>
+        <Text style={s.muted}>
+          {t("Originally {v0}", { v0: item.originalDate })}
+        </Text>
       )}
       {menu && (
         <Sheet title={item.title} onClose={() => setMenu(false)}>
           <Text style={s.body}>
-            {item.schedule.date} · {item.schedule.time ?? "Any time"} ·{" "}
-            {derived}
+            {item.schedule.date} · {item.schedule.time ?? t("Any time")} ·{" "}
+            {t(derived)}
           </Text>
           {!!item.notes && <Text style={s.body}>{item.notes}</Text>}
           {item.terminal && (
             <Text style={s.muted}>
-              {item.terminal.state}{" "}
-              {new Date(item.terminal.at).toLocaleString()} ·{" "}
+              {t(item.terminal.state)}{" "}
+              {new Date(item.terminal.at).toLocaleString(locale())} ·{" "}
               {item.terminal.zone}
             </Text>
           )}
           <Button
-            title="Edit task"
+            title={t("Edit task")}
             onPress={() => {
               setMenu(false);
               planner.edit(item);
@@ -163,7 +174,9 @@ export function TaskCard({
           {(!item.streak || item.state === "skipped") && (
             <Button
               title={
-                item.state === "skipped" ? "Unskip" : "Skip this occurrence"
+                item.state === "skipped"
+                  ? t("Unskip")
+                  : t("Skip this occurrence")
               }
               onPress={() =>
                 planner.act(async () => {
@@ -177,25 +190,27 @@ export function TaskCard({
             />
           )}
           <Button
-            title="Move to today"
+            title={t("Move to today")}
             onPress={() => {
               setMoving(true);
               setMoveDate(planner.currentDay);
             }}
           />
           <Button
-            title="Move to another date"
+            title={t("Move to another date")}
             onPress={() => setMoving(!moving)}
           />
           {moving && (
             <View style={s.card}>
               <DateField
-                label="Move to date"
+                label={t("Move to date")}
                 value={moveDate}
                 onChange={setMoveDate}
               />
               <Text style={s.body}>
-                Keeps the original date, time, duration and recurrence cadence.
+                {t(
+                  "Keeps the original date, time, duration and recurrence cadence.",
+                )}
               </Text>
               {status(
                 { ...item, schedule: { ...item.schedule, date: moveDate } },
@@ -203,12 +218,13 @@ export function TaskCard({
                 planner.now,
               ) === "overdue" && (
                 <Text style={[s.body, s.error]}>
-                  This schedule is already overdue. You can adjust its time in
-                  Edit task.
+                  {t(
+                    "This schedule is already overdue. You can adjust its time in Edit task.",
+                  )}
                 </Text>
               )}
               <Button
-                title="Confirm move"
+                title={t("Confirm move")}
                 active
                 onPress={() =>
                   planner.act(async () => {
@@ -221,22 +237,24 @@ export function TaskCard({
           )}
           {item.schedule.time === null && item.state === "pending" && (
             <View style={s.card}>
-              <Text style={s.label}>Untimed task order</Text>
+              <Text style={s.label}>{t("Untimed task order")}</Text>
               <Button
-                title="Move up in this day"
+                title={t("Move up in this day")}
                 onPress={() => planner.act(() => planner.reorder(item, -1))}
               />
               <Button
-                title="Move down in this day"
+                title={t("Move down in this day")}
                 onPress={() => planner.act(() => planner.reorder(item, 1))}
               />
               <Text style={s.muted}>
-                Changes order only. The date and recurrence stay the same.
+                {t(
+                  "Changes order only. The date and recurrence stay the same.",
+                )}
               </Text>
             </View>
           )}
           <Button
-            title="Delete…"
+            title={t("Delete\u2026")}
             variant="destructive"
             onPress={() =>
               recurring ? setDeleting(!deleting) : remove("occurrence")
@@ -244,17 +262,17 @@ export function TaskCard({
           />
           {deleting && (
             <View style={s.card}>
-              <Text style={s.section}>Delete which occurrences?</Text>
+              <Text style={s.section}>{t("Delete which occurrences?")}</Text>
               <Button
-                title="Only this occurrence"
+                title={t("Only this occurrence")}
                 onPress={() => remove("occurrence")}
               />
               <Button
-                title="This and future occurrences"
+                title={t("This and future occurrences")}
                 onPress={() => remove("future")}
               />
               <Button
-                title="Entire series, including history"
+                title={t("Entire series, including history")}
                 onPress={() => remove("series")}
               />
             </View>

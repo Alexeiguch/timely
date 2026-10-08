@@ -1,3 +1,5 @@
+import { t, locale, streakText } from "@timely/i18n";
+import { useLanguage } from "./language-state";
 import { StyleSheet, Text, View } from "react-native";
 import { Check, Flame, X } from "lucide-react-native";
 import { colors, surfaces } from "@timely/design";
@@ -6,18 +8,18 @@ import {
   boundaries,
   date,
   streakKey,
-  streakLabel,
+  formatCivilDate,
   streakOutcome,
 } from "@timely/domain";
 import { usePlanner } from "./planner-provider";
 import { s } from "./ui";
-
 export function StreakIndicator({ item }: { item: Occurrence }) {
+  useLanguage();
   const planner = usePlanner();
   const streak = planner.streaks.get(streakKey(item));
   if (!item.streak || !streak) return null;
   const outcome = streakOutcome(item, planner.zone, planner.now);
-  const due = new Intl.DateTimeFormat("en-GB", {
+  const due = new Intl.DateTimeFormat(locale(), {
     timeZone: planner.zone,
     month: "short",
     day: "numeric",
@@ -25,22 +27,28 @@ export function StreakIndicator({ item }: { item: Occurrence }) {
     minute: "2-digit",
   }).format(boundaries(item.schedule, planner.zone).due);
   const endedOn = streak.missedDate
-    ? date(streak.missedDate).toLocaleString("en-GB", {
-        month: "short",
-        day: "numeric",
-      })
+    ? formatCivilDate(
+        streak.missedDate,
+        {
+          month: "short",
+          day: "numeric",
+        },
+        locale(),
+      )
     : null;
   return (
     <View style={[styles.panel, streak.ended && styles.ended]}>
       <View
         style={styles.top}
         accessible
-        accessibilityLabel={`Current streak: ${streakLabel(streak)}`}
+        accessibilityLabel={t("Current streak: {v0}", {
+          v0: streakText(streak),
+        })}
       >
         <Flame size={22} color={streak.ended ? colors.muted : colors.text} />
-        <Text style={s.label}>{streakLabel(streak)}</Text>
+        <Text style={s.label}>{streakText(streak)}</Text>
         <Text style={s.muted}>
-          {streak.ended ? "Fresh start ahead" : "Current streak"}
+          {streak.ended ? t("Fresh start ahead") : t("Current streak")}
         </Text>
       </View>
       <View style={styles.marks}>
@@ -48,7 +56,7 @@ export function StreakIndicator({ item }: { item: Occurrence }) {
           <View
             key={mark.id}
             accessible
-            accessibilityLabel={`${mark.date}: ${mark.outcome === "completed" ? "completed before deadline" : mark.outcome === "missed" ? "missed deadline" : "still to do"}`}
+            accessibilityLabel={`${mark.date}: ${mark.outcome === "completed" ? t("completed before deadline") : mark.outcome === "missed" ? t("missed deadline") : t("still to do")}`}
             style={[
               styles.mark,
               mark.outcome === "completed" && styles.completed,
@@ -70,10 +78,18 @@ export function StreakIndicator({ item }: { item: Occurrence }) {
       </View>
       <Text style={s.muted}>
         {outcome === "missed"
-          ? "Deadline missed — the next on-time completion starts a new streak."
+          ? t(
+              "Deadline missed \u2014 the next on-time completion starts a new streak.",
+            )
           : outcome === "completed"
-            ? "Completed before the deadline. Keep it going!"
-            : `${streak.ended && endedOn ? `Ended ${endedOn}. ` : ""}Complete before ${due}.`}
+            ? t("Completed before the deadline. Keep it going!")
+            : t("{v0}Complete before {v1}.", {
+                v0:
+                  streak.ended && endedOn
+                    ? t("Ended {v0}. ", { v0: endedOn })
+                    : "",
+                v1: due,
+              })}
       </Text>
     </View>
   );

@@ -4,7 +4,7 @@ Open the repository root or `apps/mobile`; both folders have matching VS Code co
 
 ## First setup
 
-1. Start the local backend on port 3001 if it is not already running. From the repository root: `APP_ENV=local BETTER_AUTH_URL=http://localhost:3001 pnpm --filter @timely/web dev --port 3001`. Local Postgres and Mailpit must be running for email sign-in. See `setup.md`.
+1. Start the local backend on port 3001 if it is not already running. From the repository root: `APP_ENV=local BETTER_AUTH_URL=http://localhost:3001 pnpm --filter @timely/web dev --port 3001`. Local Postgres must be running. With `MAIL_MODE=resend`, codes arrive in the entered real inbox; Mailpit is used only in explicit capture mode. See `setup.md`.
 2. In VS Code, open the Command Palette (`Cmd+Shift+P`), choose **Tasks: Run Task**, then **Mobile: Start Metro**. Keep this terminal running. It binds Metro to IPv4 loopback on port 8081 and sets the simulator API address to `http://localhost:3001`.
 3. Run **Mobile: Build iOS development app** once to install a Debug build in the simulator. This may take several minutes initially. Rebuild after adding native packages or changing native configuration. The earlier Release build used for visual QA cannot expose the development debugger.
 4. Open Timely in the simulator. If the Expo development launcher appears, connect to `http://127.0.0.1:8081`.
@@ -39,8 +39,53 @@ Saved JavaScript/TypeScript changes use Fast Refresh. Metro serves the native Ja
 - **Breakpoint opens a generated bundle:** keep `enableTurboSourcemaps: false` in the checked-in launch configuration. The experimental turbo source-map path fails against this Metro/VS Code combination; the normal source-map path resolves the original TypeScript file.
 - **Inspect components/network:** disconnect the VS Code debugger, then press `j` in Metro to open React Native DevTools. Expo currently describes its VS Code integration as alpha; DevTools is the fallback.
 - **Physical phone/Android emulator:** localhost points at that device. Use a reachable development API address and a LAN Metro server, or the appropriate Android host mapping. The checked-in tasks deliberately target the local iOS simulator.
+- **Google missing on a configured development phone:** check `/api/v1/auth/providers` on the actual API address. Expo SDK 57's development virtual environment merges `.env.local` over shell `EXPO_PUBLIC_*` values; an API override can therefore keep the simulator's localhost address. Timely now resolves the API through public `extra.apiURL` in the Expo manifest, preserving the API address selected for each Metro process. Restart Metro and fully reload the app after this configuration change. A public manifest URL or a string found somewhere in a bundle does not prove the running auth client uses that URL. Apple still needs backend provider credentials; enabling its native entitlement alone does not enable sign-in.
 
 Official reference: [Expo debugging tools](https://docs.expo.dev/debugging/tools/#debugging-with-vs-code).
+
+## Connected physical iPhone development build
+
+Keep the iPhone unlocked and paired/trusted, with Developer Mode enabled under Settings → Privacy & Security. Sign in to the owner's Apple account in Xcode → Settings → Apple Accounts. Xcode needs an available Apple Development identity and a provisioning profile for the development bundle ID and device. If signing reports **PLA Update available**, the account holder must accept the latest agreement at [Apple Developer](https://developer.apple.com/account/); an agent cannot accept that legal agreement on their behalf.
+
+Use a trusted private local network for this development setup, with the phone and Mac reachable from one another. Local HTTP is permitted by the development app's local-network exception; published apps require the approved HTTPS backend. Phone `localhost` points to the phone. Use the Mac's `.local` hostname (`scutil --get LocalHostName`, followed by `.local`) for both API and Metro. Allow Timely's Local Network prompt on the phone and any macOS incoming-connection prompt. Keeping the USB cable attached provides installation/debugging access; the commands below serve the app over the local network.
+
+The physical-device servers use separate ports to preserve the simulator setup. Substitute your current Mac hostname:
+
+```sh
+# Repository root; first prepare the backend with pnpm build after backend changes.
+APP_ENV=local BETTER_AUTH_URL=http://alexeis-macbook-air.local:3002 \
+  pnpm --filter @timely/web start --hostname 0.0.0.0 --port 3002
+
+# Separate terminal, apps/mobile:
+EXPO_PUBLIC_API_URL=http://alexeis-macbook-air.local:3002 \
+  APP_VARIANT=development REACT_NATIVE_PACKAGER_HOSTNAME=alexeis-macbook-air.local \
+  node --dns-result-order=ipv4first node_modules/expo/bin/cli \
+  start --dev-client --clear --lan --port 8082
+```
+
+Discover the paired device with `xcrun devicectl list devices` and the Xcode destination with `xcrun xctrace list devices`. From `apps/mobile/ios`, build using the owner's signing team and device UDID (not simulator IDs):
+
+```sh
+EXPO_PUBLIC_API_URL=http://alexeis-macbook-air.local:3002 APP_VARIANT=development \
+  RCT_METRO_PORT=8082 xcodebuild \
+  -workspace Timelydevelopment.xcworkspace -scheme Timelydevelopment \
+  -configuration Debug -sdk iphoneos -destination 'platform=iOS,id=YOUR_DEVICE_UDID' \
+  -derivedDataPath /tmp/timely-physical-ios \
+  DEVELOPMENT_TEAM=YOUR_TEAM_ID CODE_SIGN_STYLE=Automatic \
+  -allowProvisioningUpdates -allowProvisioningDeviceRegistration build
+
+xcrun devicectl device install app --device YOUR_COREDEVICE_ID \
+  /tmp/timely-physical-ios/Build/Products/Debug-iphoneos/Timelydevelopment.app
+xcrun devicectl device process launch --device YOUR_COREDEVICE_ID \
+  --payload-url 'exp+timely://expo-development-client/?url=http%3A%2F%2Falexeis-macbook-air.local%3A8082' \
+  com.example.timely.dev
+```
+
+Use the actual configured bundle identifier if it differs. Installation should update the same development app without uninstalling or clearing saved plans. If iOS asks to trust the developer, follow Settings → General → VPN & Device Management. Keep the Mac/backend/Metro running while testing. A Metro-dependent development app does not prove offline cold-start behavior with an embedded release bundle. See [Expo local iOS signing](https://docs.expo.dev/more/expo-cli/#ios-development-signing) and [Apple physical-device setup](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices).
+
+Verified 2026-10-08: after the owner accepted Apple's agreement, the signed ARM64 Debug build installed and launched on the connected iPhone 15 (iOS 26.6.2). Metro on 8082 reports its Hermes runtime, and a public health request executed from that phone returns HTTP 200 from the backend on 3002. The signing profile includes the connected device and development debugging entitlement. This confirms installation and connectivity; provider sign-in, complete planner interaction, notifications and offline cold-start acceptance remain separate checks. The local backend uses Resend, so email codes arrive in the entered real inbox.
+
+The updated signed build was subsequently installed and launched after reconnection. Its running auth module resolves `http://alexeis-macbook-air.local:3002`; the native Google module is available. A provider request from the phone returns HTTP 200 with Google enabled and Apple disabled, and native accessibility-state inspection confirms the Google button is visible and enabled. Google consent/token exchange remains to be exercised by the owner. Apple requires its backend credentials before its button becomes available.
 
 ## Verified setup (2026-10-01)
 

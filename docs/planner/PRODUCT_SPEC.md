@@ -80,7 +80,7 @@ Use the effective rescheduled date for current planner/progress placement and pr
 
 Expose reminder toggles and morning time, first weekday (Monday initially), automatic current-device time zone, grouped-view preference, reduced motion following system preference, account sign-in methods, sign out, account deletion and sync status. Device notification permission and delivery capability are device-specific; user preferences are synchronized.
 
-English is the initial UI language. Keep copy in one localization-ready resource layer; do not add translation infrastructure that delays core behavior. Platform date/time formats follow user locale where available. Use device-detected IANA zones and display them readably.
+Spanish is the initial UI language, with English available through a compact Español / English choice on sign-in and in Settings. Persist the choice per device and apply it immediately, including interface copy, accessible names, date labels, recurrence/streak summaries, errors, sign-in mail and reminder copy. Preserve authored titles and notes. Keep shared copy in one resource layer; operating-system permission sheets and provider consent pages retain their own language behavior. Use device-detected IANA zones and display them readably. See [ADR 013](../decisions/013-spanish-default-localization.md).
 
 ## Offline experience
 

@@ -1205,3 +1205,10 @@ a {
 .streak-indicator small { display: block; line-height: 1.5; }
 .streak-setting { background: #FFF0E2; border-color: #FFBC80; }
 .streak-setting input[type="checkbox"] { width: 20px; height: 20px; accent-color: #1A5FCF; }
+
+.language-choice { margin-block: 12px 20px; }
+.language-choice .row { flex-wrap: wrap; gap: 8px; }
+.language-choice button { min-height: 44px; padding: 8px 14px; font-size: 14px; }
+.language-choice button[aria-pressed="true"] { background: var(--blue, #1A5FCF); color: white; }
+
+.signin > .language-choice { grid-column: 1 / -1; justify-self: end; margin: 0; }

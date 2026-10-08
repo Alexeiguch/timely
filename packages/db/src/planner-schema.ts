@@ -10,6 +10,8 @@ import {
   integer,
   date,
   uniqueIndex,
+  boolean,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 import type {
   Operation,
@@ -164,4 +166,68 @@ export const snapshotItems = timelySchema.table(
     record: jsonb("record").$type<SyncRecord>().notNull(),
   },
   (t) => [primaryKey({ columns: [t.ownerId, t.token, t.position] })],
+);
+export const notificationDevices = timelySchema.table(
+  "notification_devices",
+  {
+    ownerId: owner(),
+    deviceId: uuid("device_id").notNull(),
+    projectId: uuid("project_id").notNull(),
+    environment: text("environment").notNull().default(""),
+    token: text("token"),
+    tokenHash: text("token_hash"),
+    permission: text("permission").notNull(),
+    language: text("language").notNull().default("es"),
+    ready: boolean("ready").notNull().default(false),
+    plannedThrough: bigint("planned_through", { mode: "number" })
+      .notNull()
+      .default(0),
+    error: text("error"),
+    updatedAt: at(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.ownerId, t.deviceId] }),
+    uniqueIndex("notification_token").on(t.tokenHash),
+    foreignKey({
+      columns: [t.ownerId, t.deviceId],
+      foreignColumns: [syncDevices.ownerId, syncDevices.id],
+    }).onDelete("cascade"),
+  ],
+);
+export const notificationJobs = timelySchema.table(
+  "notification_jobs",
+  {
+    ownerId: owner(),
+    deviceId: uuid("device_id").notNull(),
+    key: uuid("key").notNull(),
+    occurrenceId: uuid("occurrence_id"),
+    definitionId: uuid("definition_id"),
+    version: uuid("version"),
+    kind: text("kind").notNull(),
+    day: date("day"),
+    due: bigint("due", { mode: "number" }).notNull(),
+    expires: bigint("expires", { mode: "number" }).notNull(),
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttempt: bigint("next_attempt", { mode: "number" })
+      .notNull()
+      .default(0),
+    receiptId: text("receipt_id"),
+    receiptDue: bigint("receipt_due", { mode: "number" }),
+    dispatchTokenHash: text("dispatch_token_hash"),
+    startedAt: bigint("started_at", { mode: "number" }),
+    error: text("error"),
+    createdAt: at(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.ownerId, t.deviceId, t.key] }),
+    index("notification_due").on(t.status, t.due, t.nextAttempt),
+    foreignKey({
+      columns: [t.ownerId, t.deviceId],
+      foreignColumns: [
+        notificationDevices.ownerId,
+        notificationDevices.deviceId,
+      ],
+    }).onDelete("cascade"),
+  ],
 );

@@ -22,6 +22,20 @@
       "when": 1790793790025,
       "tag": "0002_sharp_thena",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791471643092,
+      "tag": "0003_burly_supernaut",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791472594433,
+      "tag": "0004_productive_khan",
+      "breakpoints": true
     }
   ]
 }

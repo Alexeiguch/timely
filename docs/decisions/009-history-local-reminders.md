@@ -7,3 +7,5 @@ Native scheduling uses the installed Expo 57 `scheduleNotificationAsync` date-tr
 Before OS changes, the scheduler durably marks reconciliation pending. It compares desired plans with actual OS entries and mappings, removes stale/duplicate entries, recovers missing mappings after an interrupted OS call, and treats elapsed owned versions as handled. Local commands await a cancellation/reconciliation attempt. Concurrent state changes trigger another pass; startup/foreground/sync and a periodic active-app tick recover interrupted work. Sign-out/deletion cancel only this environment/account's notifications.
 
 This milestone implements local scheduling and historical search. Remote token registration, local/remote ownership handoff, Inngest processing and push receipts remain outstanding. Settings states that remote delivery is unavailable and identifies the local budget/coverage. Simulator/bundle evidence must not be presented as physical-device delivery proof.
+
+Remote ownership and provider processing were subsequently implemented by [ADR 014](014-expo-remote-reminders.md); the original milestone evidence above remains scoped to local scheduling.

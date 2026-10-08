@@ -1,3 +1,6 @@
+import { LanguageRoot } from "../src/language";
+import { t, locale } from "@timely/i18n";
+import { useLanguage } from "../src/language-state";
 import { Stack, type ErrorBoundaryProps } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useEffect } from "react";
@@ -11,8 +14,8 @@ import { colors } from "@timely/design";
 import { AccountProvider } from "../src/account";
 import { Button, s } from "../src/ui";
 void SplashScreen.preventAutoHideAsync();
-
 export default function Layout() {
+  useLanguage();
   const [loaded, error] = useFonts({
     Baloo2: Baloo2_700Bold,
     NunitoSans: NunitoSans_400Regular,
@@ -24,32 +27,36 @@ export default function Layout() {
   if (!loaded && !error)
     return (
       <View style={[s.screen, s.page]}>
-        <Text>Opening your day…</Text>
+        <Text>{t("Opening your day\u2026")}</Text>
       </View>
     );
   return (
-    <SafeAreaProvider>
-      <AccountProvider>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.background },
-          }}
-        >
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="sign-in" options={{ presentation: "modal" }} />
-        </Stack>
-      </AccountProvider>
-    </SafeAreaProvider>
+    <LanguageRoot>
+      <SafeAreaProvider>
+        <AccountProvider>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.background },
+            }}
+          >
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="sign-in" options={{ presentation: "modal" }} />
+          </Stack>
+        </AccountProvider>
+      </SafeAreaProvider>
+    </LanguageRoot>
   );
 }
-
 export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
+  useLanguage();
   return (
     <View style={[s.screen, s.page, s.center]}>
-      <Text style={s.heading}>Let’s try that again.</Text>
-      <Text style={s.body}>Your saved plans are still on this device.</Text>
-      <Button title="Reopen planner" active onPress={retry} />
+      <Text style={s.heading}>{t("Let\u2019s try that again.")}</Text>
+      <Text style={s.body}>
+        {t("Your saved plans are still on this device.")}
+      </Text>
+      <Button title={t("Reopen planner")} active onPress={retry} />
     </View>
   );
 }

@@ -1,3 +1,5 @@
+import { t, locale, errorMessage } from "@timely/i18n";
+import { useLanguage } from "./language-state";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   PanResponder,
@@ -8,7 +10,10 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import {
   CalendarDays,
@@ -18,7 +23,7 @@ import {
   ArrowDown,
   ArrowUp,
 } from "lucide-react-native";
-import { colors, surfaces } from "@timely/design";
+import { colors, surfaces, radius } from "@timely/design";
 import { civilDate, type Occurrence } from "@timely/contracts";
 import {
   addDays,
@@ -45,11 +50,21 @@ import { DateField } from "./date-field";
 import { PlannerDoodle } from "./doodle";
 import { Button, Choices, Segmented, IconButton, Sheet, s } from "./ui";
 type Row =
-  | { kind: "task"; item: Occurrence }
-  | { kind: "group"; items: Occurrence[]; id: string };
+  | {
+      kind: "task";
+      item: Occurrence;
+    }
+  | {
+      kind: "group";
+      items: Occurrence[];
+      id: string;
+    };
 export function NativePlanner() {
+  const language = useLanguage();
   const p = usePlanner();
   const account = useAccount();
+  const insets = useSafeAreaInsets();
+  const [addButtonHeight, setAddButtonHeight] = useState(56);
   const [overdueOpen, setOverdueOpen] = useState(false);
   const [picker, setPicker] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
@@ -101,10 +116,15 @@ export function NativePlanner() {
   const terminal = visible.filter((item) => item.state !== "pending");
   const rows = (items: Occurrence[]): Row[] =>
     items.map((item) => ({ kind: "task", item }));
-  const sections: Array<{ title: string; data: Row[] }> = [];
+  const sections: Array<{
+    title: string;
+    kind?: "terminal" | "overdue";
+    data: Row[];
+  }> = [];
   if (overdue.length)
     sections.push({
-      title: `Overdue (${overdue.length})`,
+      title: t("Overdue ({v0})", { v0: overdue.length }),
+      kind: "overdue",
       data: overdueOpen ? rows(overdue) : [],
     });
   if (p.mode === "Month" && p.grouped) {
@@ -123,7 +143,7 @@ export function NativePlanner() {
       else singles.push(item);
     }
     sections.push({
-      title: "Recurring plans",
+      title: t("Recurring plans"),
       data: [...groups.entries()].map(([id, items]) => ({
         kind: "group",
         id,
@@ -131,24 +151,29 @@ export function NativePlanner() {
       })),
     });
     if (singles.length)
-      sections.push({ title: "One-off plans", data: rows(singles) });
+      sections.push({ title: t("One-off plans"), data: rows(singles) });
   } else {
     const days = [...new Set(pending.map((item) => item.schedule.date))];
     for (const day of days)
       sections.push({
         title:
           p.mode === "Day"
-            ? "Your plans"
-            : formatCivilDate(day, {
-                weekday: "long",
-                month: "short",
-                day: "numeric",
-              }),
+            ? t("Your plans")
+            : formatCivilDate(
+                day,
+                {
+                  weekday: "long",
+                  month: "short",
+                  day: "numeric",
+                },
+                locale(),
+              ),
         data: rows(pending.filter((item) => item.schedule.date === day)),
       });
     if (terminal.length)
       sections.push({
-        title: `Completed & skipped (${terminal.length})`,
+        title: t("Completed & skipped ({v0})", { v0: terminal.length }),
+        kind: "terminal",
         data: terminalOpen ? rows(terminal) : [],
       });
   }
@@ -239,12 +264,21 @@ export function NativePlanner() {
       : null;
   const group = (items: Occurrence[]) => {
     const total = progress(items, p.zone, p.now);
-    const streakItem = items.find((item) => item.streak && item.state === "pending" && item.schedule.date >= p.currentDay) ?? items.at(-1)!;
+    const streakItem =
+      items.find(
+        (item) =>
+          item.streak &&
+          item.state === "pending" &&
+          item.schedule.date >= p.currentDay,
+      ) ?? items.at(-1)!;
     return (
       <View style={s.card}>
         <Text style={s.title}>{items[0]!.title}</Text>
         <Text style={s.body}>
-          {total.completed} / {total.total} scheduled, excluding skipped
+          {t("{v0} / {v1} scheduled, excluding skipped", {
+            v0: total.completed,
+            v1: total.total,
+          })}
         </Text>
         <StreakIndicator item={streakItem} />
         <ScrollView
@@ -256,13 +290,15 @@ export function NativePlanner() {
             <Button
               key={item.id}
               title={`${date(item.schedule.date).day}\n${item.state === "completed" ? "✓" : item.state === "skipped" ? "−" : status(item, p.zone, p.now) === "overdue" ? "!" : "○"}`}
-              label={`${item.schedule.date}: ${item.title}, ${status(item, p.zone, p.now)}`}
+              label={`${item.schedule.date}: ${item.title}, ${t(status(item, p.zone, p.now))}`}
               onPress={() => setFocused(item)}
             />
           ))}
         </ScrollView>
         <Text style={s.muted}>
-          ✓ Completed · − Skipped · ! Overdue · ○ Planned
+          {t(
+            "\u2713 Completed \u00B7 \u2212 Skipped \u00B7 ! Overdue \u00B7 \u25CB Planned",
+          )}
         </Text>
       </View>
     );
@@ -273,7 +309,10 @@ export function NativePlanner() {
         sections={sections}
         keyExtractor={(row) => (row.kind === "task" ? row.item.id : row.id)}
         stickySectionHeadersEnabled={false}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[
+          styles.list,
+          { paddingBottom: addButtonHeight + 48 },
+        ]}
         keyboardShouldPersistTaps="handled"
         refreshing={refreshing}
         onRefresh={() => {
@@ -286,23 +325,22 @@ export function NativePlanner() {
               <View style={s.grow}>
                 <Brand />
               </View>
-              <Button title="Add task" active onPress={() => p.add()}>
-                <Plus size={18} color={colors.surface} />
-              </Button>
             </View>
             <View>
               <Text style={s.heading} accessibilityRole="header">
-                Your day, your pace.
+                {t("Your day, your pace.")}
               </Text>
-              <Text style={s.muted}>A little space for what matters.</Text>
+              <Text style={s.muted}>
+                {t("A little space for what matters.")}
+              </Text>
             </View>
             {!!linkMessage && (
               <Text style={[s.body, s.error]} accessibilityRole="alert">
-                {linkMessage}
+                {errorMessage(linkMessage)}
               </Text>
             )}
             <Segmented
-              label="Planner view"
+              label={t("Planner view")}
               value={p.mode}
               options={["Day", "Week", "Month"] as PlannerMode[]}
               onChange={(value) => {
@@ -313,14 +351,14 @@ export function NativePlanner() {
             <View {...swipe.panHandlers} style={styles.period}>
               <View style={styles.dateRow}>
                 <IconButton
-                  label="Previous period"
+                  label={t("Previous period")}
                   onPress={() => navigate(-1)}
                 >
                   <ChevronLeft size={22} color={colors.text} />
                 </IconButton>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Choose date"
+                  accessibilityLabel={t("Choose date")}
                   onPress={() => setPicker(!picker)}
                   style={({ pressed }) => [
                     styles.dateTitle,
@@ -329,27 +367,42 @@ export function NativePlanner() {
                 >
                   <Text style={s.title}>
                     {p.mode === "Day"
-                      ? formatCivilDate(p.selected, {
-                          month: "long",
-                          day: "numeric",
-                        })
-                      : p.mode === "Week"
-                        ? `${formatCivilDate(window.from, { day: "numeric", month: "short" })} – ${formatCivilDate(window.through, { day: "numeric", month: "short" })}`
-                        : formatCivilDate(p.selected, {
+                      ? formatCivilDate(
+                          p.selected,
+                          {
                             month: "long",
-                            year: "numeric",
-                          })}
+                            day: "numeric",
+                          },
+                          locale(),
+                        )
+                      : p.mode === "Week"
+                        ? `${formatCivilDate(window.from, { day: "numeric", month: "short" }, locale())} – ${formatCivilDate(window.through, { day: "numeric", month: "short" }, locale())}`
+                        : formatCivilDate(
+                            p.selected,
+                            {
+                              month: "long",
+                              year: "numeric",
+                            },
+                            locale(),
+                          )}
                   </Text>
                   <View style={s.row}>
                     <CalendarDays size={14} color={colors.muted} />
                     <Text style={s.muted}>
                       {p.mode === "Day"
-                        ? formatCivilDate(p.selected, { weekday: "long" })
-                        : "Choose date"}
+                        ? formatCivilDate(
+                            p.selected,
+                            { weekday: "long" },
+                            locale(),
+                          )
+                        : t("Choose date")}
                     </Text>
                   </View>
                 </Pressable>
-                <IconButton label="Next period" onPress={() => navigate(1)}>
+                <IconButton
+                  label={t("Next period")}
+                  onPress={() => navigate(1)}
+                >
                   <ChevronRight size={22} color={colors.text} />
                 </IconButton>
               </View>
@@ -358,7 +411,7 @@ export function NativePlanner() {
                   <PlannerStatus compact />
                 </View>
                 <Button
-                  title="Today"
+                  title={t("Today")}
                   variant="ghost"
                   onPress={() => {
                     p.setSelected(p.currentDay);
@@ -369,7 +422,7 @@ export function NativePlanner() {
             </View>
             {picker && (
               <DateField
-                label="Focused date"
+                label={t("Focused date")}
                 value={p.selected}
                 onChange={p.setSelected}
               />
@@ -386,10 +439,14 @@ export function NativePlanner() {
                   ).map((day) => (
                     <Button
                       key={day}
-                      title={formatCivilDate(day, {
-                        weekday: "short",
-                        day: "numeric",
-                      })}
+                      title={formatCivilDate(
+                        day,
+                        {
+                          weekday: "short",
+                          day: "numeric",
+                        },
+                        locale(),
+                      )}
                       active={day === p.selected}
                       onPress={() => {
                         p.setSelected(day);
@@ -400,7 +457,7 @@ export function NativePlanner() {
                 </ScrollView>
                 {weekDayOnly && (
                   <Button
-                    title="Show the whole week"
+                    title={t("Show the whole week")}
                     onPress={() => setWeekDayOnly(false)}
                   />
                 )}
@@ -414,12 +471,12 @@ export function NativePlanner() {
                       {Array.from(
                         { length: 7 },
                         (_, i) =>
-                          ["M", "T", "W", "T", "F", "S", "S"][
+                          ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][
                             (p.preferences.firstWeekday - 1 + i) % 7
                           ],
                       ).map((d, i) => (
                         <Text key={i} style={[s.muted, styles.weekday]}>
-                          {d}
+                          {t(d!).slice(0, 1)}
                         </Text>
                       ))}
                       {calendarDays(p.selected, p.preferences.firstWeekday).map(
@@ -431,7 +488,12 @@ export function NativePlanner() {
                               accessibilityState={{
                                 selected: day === p.selected,
                               }}
-                              accessibilityLabel={`${day}, ${all.filter((item) => item.schedule.date === day).length} tasks`}
+                              accessibilityLabel={t("{v0}, {v1} tasks", {
+                                v0: day,
+                                v1: all.filter(
+                                  (item) => item.schedule.date === day,
+                                ).length,
+                              })}
                               style={[
                                 styles.day,
                                 day === p.selected && styles.selectedDay,
@@ -468,11 +530,11 @@ export function NativePlanner() {
                   </View>
                 </ScrollView>
                 <Choices
-                  label="Month details"
+                  label={t("Month details")}
                   value={p.grouped ? "grouped" : "all"}
                   options={[
-                    { value: "grouped", label: "Grouped" },
-                    { value: "all", label: "All occurrences" },
+                    { value: "grouped", label: t("Grouped") },
+                    { value: "all", label: t("All occurrences") },
                   ]}
                   onChange={(value) => p.setGrouped(value === "grouped")}
                 />
@@ -481,11 +543,16 @@ export function NativePlanner() {
             {!!all.length && (
               <View
                 style={styles.progressCard}
-                accessibilityLabel={`${totals.completed} of ${totals.total} scheduled tasks complete, skipped excluded`}
+                accessibilityLabel={t(
+                  "{v0} of {v1} scheduled tasks complete, skipped excluded",
+                  { v0: totals.completed, v1: totals.total },
+                )}
               >
                 <View style={s.grow}>
-                  <Text style={s.title}>A little progress</Text>
-                  <Text style={[s.muted, s.onAccent]}>One plan at a time.</Text>
+                  <Text style={s.title}>{t("A little progress")}</Text>
+                  <Text style={[s.muted, s.onAccent]}>
+                    {t("One plan at a time.")}
+                  </Text>
                   <View style={styles.track}>
                     <View
                       style={[
@@ -506,12 +573,14 @@ export function NativePlanner() {
             {!all.length && p.state && (
               <View style={styles.empty}>
                 <PlannerDoodle />
-                <Text style={s.section}>A little breathing room.</Text>
+                <Text style={s.section}>{t("A little breathing room.")}</Text>
                 <Text style={[s.body, styles.emptyCopy]}>
-                  A fresh page for your plans. Start with one small thing.
+                  {t(
+                    "A fresh page for your plans. Start with one small thing.",
+                  )}
                 </Text>
                 <Button
-                  title="Make a plan"
+                  title={t("Make a plan")}
                   variant="ghost"
                   onPress={() => p.add()}
                 >
@@ -522,12 +591,12 @@ export function NativePlanner() {
           </View>
         }
         renderSectionHeader={({ section }) =>
-          section.title.startsWith("Completed &") ? (
+          section.kind === "terminal" ? (
             <Button
-              title={`${terminalOpen ? "Hide" : "Show"} ${section.title.toLowerCase()}`}
+              title={`${terminalOpen ? t("Hide") : t("Show")} ${section.title.toLocaleLowerCase(locale())}`}
               onPress={() => setTerminalOpen(!terminalOpen)}
             />
-          ) : section.title.startsWith("Overdue (") ? (
+          ) : section.kind === "overdue" ? (
             <View style={styles.overdueHeader}>
               <Button
                 title={section.title}
@@ -541,7 +610,7 @@ export function NativePlanner() {
                 )}
               </Button>
               {overdueOpen && (
-                <Text style={s.muted}>From the previous 365 days</Text>
+                <Text style={s.muted}>{t("From the previous 365 days")}</Text>
               )}
             </View>
           ) : section.data.length ? (
@@ -570,14 +639,37 @@ export function NativePlanner() {
         windowSize={7}
         removeClippedSubviews={false}
       />
+      <View
+        pointerEvents="box-none"
+        onLayout={(event) =>
+          setAddButtonHeight(event.nativeEvent.layout.height)
+        }
+        style={[
+          styles.floatingAction,
+          { left: insets.left + 20, right: insets.right + 20 },
+        ]}
+      >
+        <Button
+          title={t("Add task")}
+          variant="primary"
+          onPress={() => p.add()}
+          style={styles.floatingButton}
+        >
+          <Plus size={22} color={colors.surface} accessible={false} />
+        </Button>
+      </View>
       {focused && (
-        <Sheet title="Selected occurrence" onClose={() => setFocused(null)}>
+        <Sheet
+          title={t("Selected occurrence")}
+          onClose={() => setFocused(null)}
+        >
           {focus ? (
             <TaskCard item={focus} showDate />
           ) : (
             <Text style={s.body}>
-              This occurrence has been deleted or changed. Your other plans are
-              safe.
+              {t(
+                "This occurrence has been deleted or changed. Your other plans are safe.",
+              )}
             </Text>
           )}
         </Sheet>
@@ -586,7 +678,19 @@ export function NativePlanner() {
   );
 }
 const styles = StyleSheet.create({
-  list: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32 },
+  list: { paddingHorizontal: 20, paddingTop: 12 },
+  floatingAction: { position: "absolute", bottom: 16, alignItems: "flex-end" },
+  floatingButton: {
+    minHeight: 56,
+    maxWidth: "100%",
+    paddingHorizontal: 24,
+    borderRadius: radius.pill,
+    shadowColor: colors.text,
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
   header: { gap: 20 },
   period: { gap: 4 },
   dateRow: { flexDirection: "row", gap: 8, alignItems: "center" },

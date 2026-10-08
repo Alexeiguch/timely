@@ -1,3 +1,5 @@
+import { t, locale, errorMessage } from "@timely/i18n";
+import { useLanguage } from "../../src/language-state";
 import { Tabs } from "expo-router";
 import { Text, View, StyleSheet, useWindowDimensions } from "react-native";
 import {
@@ -13,20 +15,21 @@ import { SignIn } from "../../src/sign-in";
 import { PlannerProvider } from "../../src/planner-provider";
 import { s } from "../../src/ui";
 export default function PlannerLayout() {
+  useLanguage();
   const account = useAccount();
   const insets = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
   if (!account.ready)
     return (
       <View style={[s.screen, s.page]}>
-        <Text style={s.body}>Opening your day…</Text>
+        <Text style={s.body}>{t("Opening your day\u2026")}</Text>
       </View>
     );
   if (!account.identity)
     return (
       <View style={s.screen}>
         {!!account.error && (
-          <Text style={[s.body, s.error]}>{account.error}</Text>
+          <Text style={[s.body, s.error]}>{errorMessage(account.error)}</Text>
         )}
         <SignIn />
       </View>
@@ -57,7 +60,7 @@ export default function PlannerLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            title: "Planner",
+            title: t("Planner"),
             tabBarIcon: ({ color, focused }) => (
               <View style={[styles.icon, focused && styles.selectedIcon]}>
                 <CalendarDays
@@ -72,7 +75,7 @@ export default function PlannerLayout() {
         <Tabs.Screen
           name="review"
           options={{
-            title: "Review",
+            title: t("Review"),
             tabBarIcon: ({ color, focused }) => (
               <View style={[styles.icon, focused && styles.selectedIcon]}>
                 <ChartNoAxesColumnIncreasing
@@ -87,7 +90,7 @@ export default function PlannerLayout() {
         <Tabs.Screen
           name="search"
           options={{
-            title: "Search",
+            title: t("Search"),
             tabBarIcon: ({ color, focused }) => (
               <View style={[styles.icon, focused && styles.selectedIcon]}>
                 <Search
@@ -102,7 +105,7 @@ export default function PlannerLayout() {
         <Tabs.Screen
           name="settings"
           options={{
-            title: "Settings",
+            title: t("Settings"),
             tabBarIcon: ({ color, focused }) => (
               <View style={[styles.icon, focused && styles.selectedIcon]}>
                 <Settings
@@ -118,7 +121,6 @@ export default function PlannerLayout() {
     </PlannerProvider>
   );
 }
-
 const styles = StyleSheet.create({
   dock: {
     backgroundColor: colors.surface,

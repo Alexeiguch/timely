@@ -1,0 +1,14 @@
+{
+  "name": "@timely/i18n",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@timely/contracts": "workspace:*"
+  }
+}
