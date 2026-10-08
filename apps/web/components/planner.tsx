@@ -1,5 +1,6 @@
 "use client";
 import { LanguageChoice } from "./language";
+import { PhraseCarousel } from "./phrase-carousel";
 import { t, locale, errorMessage, type Parameters } from "@timely/i18n";
 import { useLanguage } from "./language-state";
 
@@ -607,14 +608,7 @@ export function Planner({
             </button>
           ))}
         </nav>
-        <div className="sidebar-note">
-          <span aria-hidden="true">☀</span>
-          <p>
-            {t("Small steps.")}
-            <br />
-            {t("A day that feels like you.")}
-          </p>
-        </div>
+        <PhraseCarousel />
         <small className="account-email">{identity.email}</small>
       </aside>
       <main className="planner-main">
