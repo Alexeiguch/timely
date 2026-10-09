@@ -2,6 +2,12 @@
 
 Use a disposable development identity and local Docker/Mailpit or the isolated Neon development backend. Never use the root Neon production credentials for planner migrations. Google/Apple credentials and physical-device checks are separate from the local email proof.
 
+## 2026-10-08 — Standalone physical iPhone build
+
+Owner-requested Expo iOS Release build succeeded with zero errors and three build-script warnings. Artifact `/tmp/timely-standalone-ios/Timelydevelopment.app`, log `/tmp/timely-standalone-ios-build.log`. It embeds `main.jsbundle` (6,244,807 bytes), public config for the phone-reachable development API on `.local:3002`, and the existing Google native plugin. Signature verification passes with keychain access. The Release plist preserves the custom local-network permission description, allows local networking and keeps arbitrary loads disabled.
+
+Installed in place on the paired iPhone 15 using the same development bundle ID and signing team. A fresh OS process launch succeeded and the process remained running, with no Metro server. No uninstall, local-data purge or planner mutation occurred. The backend was restarted and returns healthy. Owner-observed planner UI, auth restoration and full offline/notification behavior after this update remain unverified; earlier physical notification evidence is unchanged. No cloud or store artifact was submitted. Reproduce using [standalone instructions](mobile-debugging.md#run-on-iphone-without-metro).
+
 ## Build and run
 
 - `pnpm --filter @timely/mobile typecheck`

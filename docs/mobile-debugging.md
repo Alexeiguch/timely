@@ -87,6 +87,30 @@ Verified 2026-10-08: after the owner accepted Apple's agreement, the signed ARM6
 
 The updated signed build was subsequently installed and launched after reconnection. Its running auth module resolves `http://alexeis-macbook-air.local:3002`; the native Google module is available. A provider request from the phone returns HTTP 200 with Google enabled and Apple disabled, and native accessibility-state inspection confirms the Google button is visible and enabled. Google consent/token exchange remains to be exercised by the owner. Apple requires its backend credentials before its button becomes available.
 
+## Run on iPhone without Metro
+
+Use a Release build with embedded JavaScript. From `apps/mobile`, with the public provider configuration in the ignored `.env.local`:
+
+```sh
+EXPO_PUBLIC_API_URL=http://alexeis-macbook-air.local:3002 \
+  APP_VARIANT=development EXPO_NO_DOTENV=1 \
+  node --env-file=.env.local node_modules/expo/bin/cli prebuild --platform ios
+
+EXPO_PUBLIC_API_URL=http://alexeis-macbook-air.local:3002 \
+  APP_VARIANT=development EXPO_NO_DOTENV=1 \
+  node --env-file=.env.local node_modules/expo/bin/cli run:ios \
+  --configuration Release --no-bundler --device YOUR_DEVICE_UDID \
+  --output /tmp/timely-standalone-ios
+```
+
+Alternatively, after loading the same environment, run `pnpm ios:standalone --device YOUR_DEVICE_UDID`. Use your Mac's actual `.local` hostname. `EXPO_NO_DOTENV=1` prevents Expo's environment loader from substituting the simulator's localhost address; Node loads the existing public Google IDs and URL scheme, while explicit shell values select the phone backend.
+
+Open Timely directly from its home-screen icon. Metro runs during compilation to produce the embedded bundle, but no Metro server is needed to open or restart the installed app. Source changes require another build. The Mac/backend must remain reachable for sign-in, synchronization and the local remote-push worker; previously saved offline plans remain on the phone.
+
+This build retains `APP_VARIANT=development`, `com.example.timely.dev`, the auth URL/storage prefix and existing signing team. Install over the existing app without uninstalling or clearing its storage. Development iOS configuration explicitly preserves local-network access and a backend-specific permission description in Release. Preview/production still require HTTPS; this is local development, not a store release. See [ADR 015](decisions/015-standalone-local-ios.md).
+
+For EAS internal distribution, `eas build --platform ios --profile standalone` resolves a Release build with `developmentClient=false` and the same development identity. Configure the **development EAS environment** with the intended `EXPO_PUBLIC_API_URL`, public Google client IDs and `GOOGLE_IOS_URL_SCHEME` first: ignored `.env.local` does not travel to cloud builders. EAS requires a valid signing profile containing the intended iPhone. This profile has been validated with the installed EAS CLI schema; cloud distribution/signing remains separate from the local installed artifact.
+
 ## Verified setup (2026-10-01)
 
 Expo Tools 1.6.3 attached to the iPhone simulator running the signed Debug configuration. Metro runs on `127.0.0.1:8081`. Reloading the app hit the solid editor breakpoint at `src/brand.tsx:3`, with the original TypeScript source, variables and call stack visible. The session was left paused there for the owner; F5 continues. Remove the sample breakpoint by clicking its gutter marker when finished.

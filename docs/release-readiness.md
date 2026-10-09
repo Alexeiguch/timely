@@ -1,6 +1,6 @@
 # Release preparation and remaining gates
 
-No production publishing, DNS changes or store submissions have been performed. The existing Neon hello deployment remains unchanged. Local planner development uses Docker Postgres/Mailpit or the isolated `timely-development` Neon branch, never the root production environment.
+The web planner was published with owner authorization on 2026-10-08 at [timely-mauve-five.vercel.app](https://timely-mauve-five.vercel.app), using the separate `timely-vercel` Neon branch/database. Hosted email OTP/session/task-sync smoke checks pass; full release acceptance remains unfinished. No DNS changes or store submissions have been performed. The existing Neon hello deployment remains unchanged. Local planner development uses Docker Postgres/Mailpit or the isolated `timely-development` Neon branch, never the root production environment.
 
 ## Executable local checks
 
@@ -32,9 +32,9 @@ CI now defines disposable Postgres/Mailpit services, runs migrations and real tr
 
 1. Register the self-hosted Google callbacks for local ports 3000/3001 and final staging/production HTTPS origin, then verify real consent and token exchange on web/iOS/Android. Native Google requires registered platform client IDs and Android SHA identities.
 2. Supply Apple App/Service IDs, a current generated client secret and an HTTPS callback; verify first/repeat authorization and private relay on physical iOS plus supported Android browser flow.
-3. Configure Resend secrets in the approved hosted backend and verify a real inbox sign-in. The local backend uses the owner's verified `findmatchuy.com` domain and passes a live Resend simulator sign-in check as of 2026-10-08; human inbox and hosted deployment delivery remain unverified.
+3. Verify a real inbox sign-in. Resend secrets are configured in the Vercel backend, and both local and hosted synthetic delivery simulator sign-in checks pass as of 2026-10-08 using the owner's verified `findmatchuy.com` sender. Human inbox delivery remains unverified.
 4. Choose registered production app identifiers, EAS project/signing credentials and physical iOS/Android test devices; upload push credentials to the linked Expo project and configure hosted Inngest event/signing keys and approved cadence/plan. Apple EAS key creation returned maintenance; the owner created a key on Apple directly, and that existing key is now uploaded/assigned in Expo. A real test receipt confirms APNs handoff and the owner observed the repeated remote iPhone test. Android FCM v1 and hosted worker verification remain open.
-5. Authorize actual publication, production migrations, DNS changes and store submission only after reviewable release artifacts and the above checks are complete.
+5. Web publication was explicitly authorized and completed on 2026-10-08. Additional production migrations, DNS changes and store submission still need their specific owner authorization; open acceptance checks remain open after hosting.
 
 ## Recovery
 
