@@ -388,6 +388,8 @@ a {
   min-width: 0;
 }
 .phrase-viewport {
+  position: relative;
+  min-height: 156px;
   overflow: hidden;
   border-radius: 24px;
   touch-action: pan-y;
@@ -401,20 +403,23 @@ a {
 .phrase-viewport:active {
   cursor: grabbing;
 }
-.phrase-track {
-  display: flex;
-  align-items: stretch;
-  will-change: transform;
-}
 .phrase-card {
-  flex: 0 0 100%;
-  min-width: 0;
-  min-height: 156px;
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
   padding: 18px 16px 16px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 12px;
+  border-radius: 24px;
+}
+.phrase-card.is-front {
+  visibility: visible;
+  z-index: 2;
+}
+.phrase-viewport.is-dragging .phrase-card.is-front {
+  box-shadow: 0 14px 28px rgba(20, 41, 77, 0.18);
 }
 .phrase-card > span {
   font-size: 34px;
@@ -1124,8 +1129,10 @@ a {
   .workspace-header h1 {
     font-size: 32px;
   }
-  .phrase-card {
+  .phrase-viewport {
     min-height: 132px;
+  }
+  .phrase-card {
     padding: 14px 12px;
   }
   .phrase-card p {

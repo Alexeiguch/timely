@@ -1,26 +1,30 @@
 import { expect, it } from "vitest";
 import {
-  resistedOffset,
+  cardOffset,
   settleIndex,
   velocityFrom,
 } from "../apps/web/components/phrase-motion";
 
 const span = 188;
 
-it("follows the finger inside the deck and resists both ends", () => {
-  expect(resistedOffset(-span, -span * 3, span)).toBe(-span);
-  const start = resistedOffset(80, -span * 3, span);
-  const further = resistedOffset(320, -span * 3, span);
+it("moves the card with the drag and resists both ends", () => {
+  expect(cardOffset(-40, 1, 4, span)).toBe(-40);
+  expect(cardOffset(55, 1, 4, span)).toBe(55);
+  const start = cardOffset(80, 0, 4, span);
+  const further = cardOffset(320, 0, 4, span);
   expect(start).toBeGreaterThan(0);
   expect(start).toBeLessThan(80);
   expect(further).toBeGreaterThan(start);
   expect(further).toBeLessThan(span);
-  const end = resistedOffset(-span * 3 - 80, -span * 3, span);
-  const harder = resistedOffset(-span * 3 - 320, -span * 3, span);
-  expect(end).toBeLessThan(-span * 3);
-  expect(end).toBeGreaterThan(-span * 4);
+  expect(cardOffset(-60, 0, 4, span)).toBe(-60);
+  const end = cardOffset(-80, 3, 4, span);
+  const harder = cardOffset(-320, 3, 4, span);
+  expect(end).toBeLessThan(0);
+  expect(end).toBeGreaterThan(-80);
   expect(harder).toBeLessThan(end);
-  expect(harder).toBeGreaterThan(-span * 4);
+  expect(harder).toBeGreaterThan(-span);
+  expect(cardOffset(50, 3, 4, span)).toBe(50);
+  expect(cardOffset(40, 0, 1, span)).toBe(0);
 });
 
 it("advances one card from a committed drag and snaps back from a short one", () => {
