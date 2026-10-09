@@ -65,6 +65,8 @@ Open http://localhost:3000 and sign in with any `@example.test` address. The cod
 pnpm dev:mobile
 ```
 
+For an iPhone build that opens without Metro, use the [standalone Release build instructions](docs/mobile-debugging.md#run-on-iphone-without-metro). Sign-in and sync still need the configured backend.
+
 Setup for Google, Apple, hosted email, and Neon is in [docs/setup.md](docs/setup.md). Product behavior lives in [docs/planner](docs/planner/README.md). What is finished, and what is not, is tracked in [docs/progress.md](docs/progress.md).
 
 ```sh

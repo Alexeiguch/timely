@@ -1,0 +1,26 @@
+# Local credentials and development state must never be uploaded as source.
+.env
+.env.*
+**/.env
+**/.env.*
+client_secret_*.json
+**/client_secret_*.json
+.neon
+.codex/
+.agents/
+.local/
+.vercel/
+
+# Native build artifacts and local verification output are not web inputs.
+apps/mobile/ios/
+apps/mobile/android/
+**/.expo/
+**/.next/
+**/.turbo/
+**/node_modules/
+test-results/
+playwright-report/
+docs/evidence/
+
+# pnpm's frozen lockfile records this hook; Vercel excludes it by default.
+!.pnpmfile.cjs

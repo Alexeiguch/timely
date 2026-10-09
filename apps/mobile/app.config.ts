@@ -21,6 +21,18 @@ const config: ExpoConfig = {
     bundleIdentifier: `${process.env.APP_IDENTIFIER ?? "com.example.timely"}${suffix}`,
     supportsTablet: true,
     usesAppleSignIn: true,
+    ...(variant === "development"
+      ? {
+          infoPlist: {
+            NSAppTransportSecurity: {
+              NSAllowsArbitraryLoads: false,
+              NSAllowsLocalNetworking: true,
+            },
+            NSLocalNetworkUsageDescription:
+              "Timely connects to the planner backend on your Mac for sign-in and sync during local development.",
+          },
+        }
+      : {}),
   },
   android: {
     adaptiveIcon: {

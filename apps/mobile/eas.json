@@ -16,6 +16,14 @@
         "APP_VARIANT": "preview"
       }
     },
+    "standalone": {
+      "extends": "development",
+      "developmentClient": false,
+      "environment": "development",
+      "ios": {
+        "buildConfiguration": "Release"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "env": {
