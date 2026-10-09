@@ -1,3 +1,5 @@
+import { t, errorMessage, type Parameters } from "@timely/i18n";
+import { useLanguage } from "./language-state";
 import {
   createContext,
   useContext,
@@ -53,15 +55,21 @@ import type {
   HistoryRequest,
   HistoryResponse,
 } from "@timely/contracts";
-import { authClient, authenticatedFetch } from "./auth";
+import { authClient, authenticatedFetch, apiURL } from "./auth";
 import { useAccount } from "./account";
 import { localStore, queueNotificationCleanup } from "./local-store";
+import { createPushCoverage, sendPushTest, invalidatePushToken } from "./push";
 import { TaskEditor } from "./task-editor";
 import { Button, s } from "./ui";
 import * as Notifications from "expo-notifications";
-import { notificationAdapter, requestReminderPermission, flushNotificationCleanup } from "./notifications";
+import {
+  notificationAdapter,
+  requestReminderPermission,
+  flushNotificationCleanup,
+} from "./notifications";
 type Undo = {
   label: string;
+  parameters?: Parameters;
   definitionId: string;
   command: Command;
   expires: number;
@@ -97,6 +105,7 @@ type Planner = {
   deleteAccount: () => Promise<void>;
   retry: () => Promise<void>;
   history: (input: HistoryRequest) => Promise<HistoryResponse>;
+  testPush: () => Promise<void>;
   discard: (definitionId: string) => Promise<void>;
   act: (work: () => Promise<void>) => void;
 };
@@ -108,6 +117,7 @@ export function PlannerProvider({
   children: ReactNode;
   ownerId: string;
 }) {
+  const language = useLanguage();
   const account = useAccount();
   const [state, setLocal] = useState<LocalState | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -129,17 +139,36 @@ export function PlannerProvider({
   const [undoing, setUndoing] = useState(false);
   const alive = useRef(true);
   const store = useMemo(() => localStore(ownerId), [ownerId]);
-  const accountApi = useMemo(() => accountActions(authenticatedFetch, ownerId), [ownerId]);
-  const reminders = useMemo(() => new LocalReminderScheduler(store, notificationAdapter, () => Intl.DateTimeFormat().resolvedOptions().timeZone), [store]);
-  const reconcileReminders = () => reminders.run().catch(() => {
-    if (alive.current) setMessage("Some reminders could not be updated. Open Settings to retry.");
-  });
+  const pushCoverage = useMemo(() => createPushCoverage(), [ownerId]);
+  const accountApi = useMemo(
+    () => accountActions(authenticatedFetch, ownerId),
+    [ownerId],
+  );
+  const reminders = useMemo(
+    () =>
+      new LocalReminderScheduler(
+        store,
+        notificationAdapter,
+        () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+        pushCoverage,
+      ),
+    [store],
+  );
+  const reconcileReminders = () =>
+    reminders.run().catch(() => {
+      if (alive.current)
+        setMessage(
+          "Some reminders could not be updated. Open Settings to retry.",
+        );
+    });
   const engine = useMemo(
     () =>
       new SyncEngine(
         store,
         async (path, body) => {
           try {
+            if (path === "sync/push")
+              await pushCoverage.prepare(await store.read(), []);
             const result = await httpTransport((url, init) =>
               authenticatedFetch(url, {
                 ...init,
@@ -196,6 +225,10 @@ export function PlannerProvider({
   };
   useEffect(() => {
     alive.current = true;
+    const tokenChanged = Notifications.addPushTokenListener(() => {
+      invalidatePushToken();
+      void reconcileReminders();
+    });
     reload();
     const unsubscribe = store.subscribe(reload);
     const tick = (quiet: boolean) => {
@@ -220,6 +253,7 @@ export function PlannerProvider({
     return () => {
       alive.current = false;
       unsubscribe();
+      tokenChanged.remove();
       clearInterval(timer);
       foreground.remove();
       network.remove();
@@ -238,22 +272,68 @@ export function PlannerProvider({
     [state],
   );
   const records = visible.records;
-  const streaks = useMemo(() => streakSummaries(records, zone, now), [records, zone, now]);
+  const streaks = useMemo(
+    () => streakSummaries(records, zone, now),
+    [records, zone, now],
+  );
   const currentDay = today(zone, now);
   useEffect(() => {
     void reconcileReminders();
-  }, [state?.clock.physical, state?.clock.logical, state?.cursor, state?.outbox.length]);
+  }, [
+    state?.clock.physical,
+    state?.clock.logical,
+    state?.cursor,
+    state?.outbox.length,
+    language,
+  ]);
   useEffect(() => {
     const open = async (response: Notifications.NotificationResponse) => {
       const data = response.notification.request.content.data ?? {};
-      if (typeof data.ownerId !== "string" || typeof data.occurrenceId !== "string" || typeof data.day !== "string") return;
-      const item = linkedOccurrence(visibleRecords(await store.read()).records, { ownerId: data.ownerId, occurrenceId: data.occurrenceId, day: data.day }, ownerId);
-      if (item) { setSelected(item.schedule.date); setMode("Day"); setEditor({ task: editableTask(visibleRecords(await store.read()).records.find((record) => record.id === item.definitionId)!, item), item }); }
-      else if (data.ownerId === ownerId) Alert.alert("Plan updated", "This occurrence is no longer available. Your current plans are unchanged.");
+      if (
+        data.environment !== apiURL ||
+        typeof data.ownerId !== "string" ||
+        typeof data.occurrenceId !== "string" ||
+        typeof data.day !== "string"
+      )
+        return;
+      const item = linkedOccurrence(
+        visibleRecords(await store.read()).records,
+        {
+          ownerId: data.ownerId,
+          occurrenceId: data.occurrenceId,
+          day: data.day,
+        },
+        ownerId,
+      );
+      if (item) {
+        setSelected(item.schedule.date);
+        setMode("Day");
+        setEditor({
+          task: editableTask(
+            visibleRecords(await store.read()).records.find(
+              (record) => record.id === item.definitionId,
+            )!,
+            item,
+          ),
+          item,
+        });
+      } else if (data.ownerId === ownerId)
+        Alert.alert(
+          t("Plan updated"),
+          t(
+            "This occurrence is no longer available. Your current plans are unchanged.",
+          ),
+        );
       await Notifications.clearLastNotificationResponseAsync();
     };
-    const subscription = Notifications.addNotificationResponseReceivedListener((response) => { void open(response); });
-    void Notifications.getLastNotificationResponseAsync().then((response) => { if (response) void open(response); });
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        void open(response);
+      },
+    );
+    void Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) void open(response);
+    });
     return () => subscription.remove();
   }, [store, ownerId]);
   const persist = async (
@@ -261,6 +341,7 @@ export function PlannerProvider({
     command: Command,
     inverse?: Command,
     label = "Change saved",
+    parameters?: Parameters,
   ) => {
     const operation = await saveLocal(
       store,
@@ -272,7 +353,13 @@ export function PlannerProvider({
     setSyncStatus("Saved locally");
     setUndo(
       inverse
-        ? { definitionId, command: inverse, label, expires: Date.now() + 8000 }
+        ? {
+            definitionId,
+            command: inverse,
+            label,
+            parameters,
+            expires: Date.now() + 8000,
+          }
         : null,
     );
     void engine
@@ -282,16 +369,25 @@ export function PlannerProvider({
   };
   const act = (work: () => Promise<void>) => {
     void work().catch((error) =>
-      Alert.alert(
-        "Unable to save",
-        error instanceof Error ? error.message : "Please try again.",
-      ),
+      Alert.alert(t("Unable to save"), errorMessage(error)),
     );
   };
   const clearLocalAccount = async () => {
-    try { await store.purge(); } finally { await account.clear(); }
+    try {
+      await store.purge();
+    } finally {
+      await account.clear();
+    }
   };
   const value: Planner = {
+    testPush: async () => {
+      await runSync();
+      await reconcileReminders();
+      await sendPushTest(await store.read());
+      setMessage(
+        "Test scheduled. It may take up to a minute. Leave Timely to see it.",
+      );
+    },
     records,
     streaks,
     history: (input) => loadHistory(authenticatedFetch, ownerId, input),
@@ -371,7 +467,8 @@ export function PlannerProvider({
           patch: { schedule: item.schedule },
           currentDay,
         },
-        `Moved to ${day}`,
+        "Moved to {v0}",
+        { v0: day },
       );
     },
     remove: async (item, scope) => {
@@ -414,12 +511,20 @@ export function PlannerProvider({
     },
     retry: async () => {
       await engine.pause();
-      try { await retrySavedChanges(store); } finally { engine.resume(); }
+      try {
+        await retrySavedChanges(store);
+      } finally {
+        engine.resume();
+      }
       await runSync();
     },
     discard: async (definitionId) => {
       await engine.pause();
-      try { await discardLocalChanges(store, definitionId); } finally { engine.resume(); }
+      try {
+        await discardLocalChanges(store, definitionId);
+      } finally {
+        engine.resume();
+      }
       await runSync();
     },
     deleteAccount: async () => {
@@ -427,13 +532,23 @@ export function PlannerProvider({
       await reminders.pause();
       try {
         await accountApi.delete();
-      } catch (error) { engine.resume(); reminders.resume(); throw error; }
+      } catch (error) {
+        engine.resume();
+        reminders.resume();
+        throw error;
+      }
       try {
         await queueNotificationCleanup(ownerId);
-        await flushNotificationCleanup().catch(() => { /* Retry after restart; account cleanup still completes. */ });
+        await flushNotificationCleanup().catch(() => {
+          /* Retry after restart; account cleanup still completes. */
+        });
       } finally {
         // A revoked account must leave memory even if storage or OS cleanup fails.
-        try { await authClient.signOut(); } finally { await clearLocalAccount(); }
+        try {
+          await authClient.signOut();
+        } finally {
+          await clearLocalAccount();
+        }
       }
     },
     signOut: async (discard = false) => {
@@ -444,16 +559,28 @@ export function PlannerProvider({
       try {
         const current = await store.read();
         if (current.outbox.length && !discard)
-          throw new Error("You have unsynced changes. Reconnect and sync before signing out.");
+          throw new Error(
+            "You have unsynced changes. Reconnect and sync before signing out.",
+          );
         await accountApi.unregister(current.deviceId);
         const result = await authClient.signOut();
         if (result.error) throw new Error(result.error.message);
         signedOut = true;
         try {
           await queueNotificationCleanup(ownerId);
-          await flushNotificationCleanup().catch(() => { /* Account-local cleanup stays queued. */ });
-        } finally { await clearLocalAccount(); }
-      } catch (error) { if (!signedOut) { engine.resume(); reminders.resume(); } throw error; }
+          await flushNotificationCleanup().catch(() => {
+            /* Account-local cleanup stays queued. */
+          });
+        } finally {
+          await clearLocalAccount();
+        }
+      } catch (error) {
+        if (!signedOut) {
+          engine.resume();
+          reminders.resume();
+        }
+        throw error;
+      }
     },
     act,
   };
@@ -462,9 +589,9 @@ export function PlannerProvider({
       {children}
       {undo && (
         <View style={s.notice} accessibilityLiveRegion="polite">
-          <Text style={s.body}>{undo.label}</Text>
+          <Text style={s.body}>{t(undo.label, undo.parameters)}</Text>
           <Button
-            title="Undo"
+            title={t("Undo")}
             disabled={undoing}
             onPress={() => {
               setUndoing(true);
@@ -494,7 +621,10 @@ export function PlannerProvider({
               currentDay,
             );
             if (command) await persist(task.id, command);
-            if (task.reminders.enabled) { await requestReminderPermission(); await reconcileReminders(); }
+            if (task.reminders.enabled) {
+              await requestReminderPermission();
+              await reconcileReminders();
+            }
           }}
         />
       )}

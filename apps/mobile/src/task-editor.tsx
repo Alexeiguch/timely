@@ -1,3 +1,5 @@
+import { t, locale, errorMessage, recurrenceText } from "@timely/i18n";
+import { useLanguage } from "./language-state";
 import { useMemo, useState } from "react";
 import { Alert, Keyboard, Switch, Text, View } from "react-native";
 import {
@@ -8,12 +10,7 @@ import {
   type Selector,
   type Occurrence,
 } from "@timely/contracts";
-import {
-  preview,
-  recurrencePreset,
-  ruleSummary,
-  type Scope,
-} from "@timely/domain";
+import { preview, recurrencePreset, type Scope } from "@timely/domain";
 import { Button, Choices, Field, Sheet, s } from "./ui";
 import { DateField } from "./date-field";
 const weekdays = [
@@ -52,6 +49,7 @@ export function TaskEditor({
   onSave: (task: Task, scope: Scope) => Promise<void>;
   onClose: () => void;
 }) {
+  useLanguage();
   const [task, setTask] = useState(initial);
   const [details, setDetails] = useState(!!item);
   const [scopeChoice, setScopeChoice] = useState(false);
@@ -77,18 +75,20 @@ export function TaskEditor({
       onClose();
       return;
     }
-    Alert.alert("Discard unsaved changes?", "Your saved tasks are unchanged.", [
-      { text: "Keep editing", style: "cancel" },
-      { text: "Discard", style: "destructive", onPress: onClose },
-    ]);
+    Alert.alert(
+      t("Discard unsaved changes?"),
+      t("Your saved tasks are unchanged."),
+      [
+        { text: t("Keep editing"), style: "cancel" },
+        { text: t("Discard"), style: "destructive", onPress: onClose },
+      ],
+    );
   };
   const save = async (scope?: Scope) => {
     const parsed = taskSchema.safeParse(task);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
-      setError(
-        `${issue?.path.join(".") ?? "Task"}: ${issue?.message ?? "Check the fields."}`,
-      );
+      setError(t("Check the task fields."));
       return;
     }
     if (item && (initial.rule || parsed.data.rule) && !scope) {
@@ -103,7 +103,7 @@ export function TaskEditor({
       await onSave(parsed.data, scope ?? "occurrence");
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to save.");
+      setError(e instanceof Error ? e.message : t("Unable to save."));
     } finally {
       setSaving(false);
     }
@@ -113,46 +113,52 @@ export function TaskEditor({
   const setSelector = (value: Selector) => setRule({ selector: value });
   if (scopeChoice)
     return (
-      <Sheet title="Apply changes to…" onClose={() => setScopeChoice(false)}>
+      <Sheet
+        title={t("Apply changes to\u2026")}
+        onClose={() => setScopeChoice(false)}
+      >
         <View style={s.notice}>
           <Text style={s.title}>{task.title}</Text>
           <Text style={s.body}>
-            Completed history stays unchanged by series edits.
+            {t("Completed history stays unchanged by series edits.")}
           </Text>
           {!seriesChoiceChanged && (
             <Button
-              title="Only this occurrence"
+              title={t("Only this occurrence")}
               disabled={saving}
               onPress={() => void save("occurrence")}
             />
           )}
           <Button
-            title="This and future occurrences"
+            title={t("This and future occurrences")}
             disabled={saving}
             onPress={() => void save("future")}
           />
           <Button
-            title="Series from today onward"
+            title={t("Series from today onward")}
             disabled={saving}
             onPress={() => void save("series")}
           />
-          <Button title="Keep editing" onPress={() => setScopeChoice(false)} />
+          <Button
+            title={t("Keep editing")}
+            onPress={() => setScopeChoice(false)}
+          />
         </View>
         {error ? (
           <Text style={[s.body, s.error]} accessibilityRole="alert">
-            {error}
+            {errorMessage(error)}
           </Text>
         ) : null}
       </Sheet>
     );
   return (
     <Sheet
-      title={item ? "A little adjustment" : "Make a little plan"}
+      title={item ? t("A little adjustment") : t("Make a little plan")}
       onClose={close}
       footer={
         !scopeChoice ? (
           <Button
-            title="Save task"
+            title={t("Save task")}
             active
             loading={saving}
             onPress={() => void save()}
@@ -161,31 +167,31 @@ export function TaskEditor({
       }
     >
       <Field
-        label="Task title"
+        label={t("Task title")}
         value={task.title}
         maxLength={200}
-        placeholder="What would you like to do?"
+        placeholder={t("What would you like to do?")}
         autoFocus={!item}
         onChangeText={(title) => patch({ title })}
       />
       <Text style={s.muted}>
-        For {task.schedule.date}. A title is all you need.
+        {t("For {v0}. A title is all you need.", { v0: task.schedule.date })}
       </Text>
       <Button
-        title={details ? "Hide optional details" : "Add optional details"}
+        title={details ? t("Hide optional details") : t("Add optional details")}
         onPress={() => setDetails(!details)}
       />
       {details && (
         <>
           <DateField
-            label="Date"
+            label={t("Date")}
             value={task.schedule.date}
             onChange={(value) =>
               patch({ schedule: { ...task.schedule, date: value } })
             }
           />
           <DateField
-            label="Start time"
+            label={t("Start time")}
             mode="time"
             value={task.schedule.time}
             onChange={(time) => patch({ schedule: { ...task.schedule, time } })}
@@ -194,7 +200,7 @@ export function TaskEditor({
             }
           />
           <Field
-            label="Duration in minutes (optional)"
+            label={t("Duration in minutes (optional)")}
             value={
               task.schedule.duration === null
                 ? ""
@@ -211,17 +217,16 @@ export function TaskEditor({
             }
           />
           <Text style={s.muted}>
-            1–10,080 minutes. Time and duration can be cleared separately.
+            {t(
+              "1\u201310,080 minutes. Time and duration can be cleared separately.",
+            )}
           </Text>
           <Choices
-            label="Priority"
+            label={t("Priority")}
             value={task.priority ?? "none"}
             options={["none", "low", "medium", "high"].map((value) => ({
               value,
-              label:
-                value === "none"
-                  ? "No priority"
-                  : `${value[0]!.toUpperCase()}${value.slice(1)}`,
+              label: value === "none" ? t("No priority") : t(value),
             }))}
             onChange={(value) =>
               patch({
@@ -230,22 +235,22 @@ export function TaskEditor({
             }
           />
           <Field
-            label="Notes"
+            label={t("Notes")}
             value={task.notes}
             maxLength={10000}
             multiline
             onChangeText={(notes) => patch({ notes })}
           />
           <Choices
-            label="Repeat preset"
+            label={t("Repeat preset")}
             value={task.rule?.frequency ?? "none"}
             options={[
-              { value: "none", label: "Does not repeat" },
-              { value: "daily", label: "Every day" },
-              { value: "weekdays", label: "Weekdays" },
-              { value: "weekly", label: "Weekly" },
-              { value: "monthly", label: "Monthly" },
-              { value: "yearly", label: "Yearly" },
+              { value: "none", label: t("Does not repeat") },
+              { value: "daily", label: t("Every day") },
+              { value: "weekdays", label: t("Weekdays") },
+              { value: "weekly", label: t("Weekly") },
+              { value: "monthly", label: t("Monthly") },
+              { value: "yearly", label: t("Yearly") },
             ]}
             onChange={(value) =>
               patch({
@@ -259,32 +264,43 @@ export function TaskEditor({
           />
           {task.rule && (
             <View style={s.card}>
-              <Text style={s.section}>Customize recurrence</Text>
+              <Text style={s.section}>{t("Customize recurrence")}</Text>
               <DateField
-                label="Recurrence start"
+                label={t("Recurrence start")}
                 value={task.rule.anchor}
                 onChange={(anchor) => setRule({ anchor })}
               />
               <Field
-                label={`Every how many ${task.rule.frequency === "daily" ? "days" : task.rule.frequency === "weekly" ? "weeks" : task.rule.frequency === "monthly" ? "months" : "years"}?`}
+                label={t("Every how many {v0}?", {
+                  v0:
+                    task.rule.frequency === "daily"
+                      ? t("days")
+                      : task.rule.frequency === "weekly"
+                        ? t("weeks")
+                        : task.rule.frequency === "monthly"
+                          ? t("months")
+                          : t("years"),
+                })}
                 value={String(task.rule.interval)}
                 keyboardType="number-pad"
                 onChangeText={(value) => setRule({ interval: Number(value) })}
               />
               {task.rule.frequency === "weekly" && (
                 <>
-                  <Text style={s.label}>Repeat on</Text>
+                  <Text style={s.label}>{t("Repeat on")}</Text>
                   <View style={s.row}>
                     {weekdays.map((name, index) => {
                       const rule = task.rule as Extract<
                         Rule,
-                        { frequency: "weekly" }
+                        {
+                          frequency: "weekly";
+                        }
                       >;
                       return (
                         <Button
                           key={name}
-                          title={name.slice(0, 3)}
-                          label={`Repeat on ${name}`}
+                          title={t(name).slice(0, 3)}
+                          label={t("Repeat on {v0}", { v0: t(name) })}
                           active={rule.weekdays.includes(index + 1)}
                           onPress={() =>
                             setRule({
@@ -298,11 +314,11 @@ export function TaskEditor({
                     })}
                   </View>
                   <Choices
-                    label="Recurrence week starts"
+                    label={t("Recurrence week starts")}
                     value={task.rule.firstWeekday}
                     options={weekdays.map((name, i) => ({
                       value: i + 1,
-                      label: name.slice(0, 3),
+                      label: t(name).slice(0, 3),
                     }))}
                     onChange={(firstWeekday) => setRule({ firstWeekday })}
                   />
@@ -310,11 +326,11 @@ export function TaskEditor({
               )}
               {task.rule.frequency === "yearly" && (
                 <Choices
-                  label="Month"
+                  label={t("Month")}
                   value={task.rule.month}
                   options={months.map((name, i) => ({
                     value: i + 1,
-                    label: name.slice(0, 3),
+                    label: t(name).slice(0, 3),
                   }))}
                   onChange={(month) => setRule({ month })}
                 />
@@ -322,12 +338,12 @@ export function TaskEditor({
               {selector && (
                 <>
                   <Choices
-                    label="Monthly pattern"
+                    label={t("Monthly pattern")}
                     value={selector.kind}
                     options={[
-                      { value: "days", label: "Dates" },
-                      { value: "ordinal", label: "Ordinal weekday" },
-                      { value: "last-day", label: "Last day" },
+                      { value: "days", label: t("Dates") },
+                      { value: "ordinal", label: t("Ordinal weekday") },
+                      { value: "last-day", label: t("Last day") },
                     ]}
                     onChange={(kind) =>
                       setSelector(
@@ -345,14 +361,14 @@ export function TaskEditor({
                   />
                   {selector.kind === "days" && (
                     <>
-                      <Text style={s.label}>Days of the month</Text>
+                      <Text style={s.label}>{t("Days of the month")}</Text>
                       <View style={s.row}>
                         {Array.from({ length: 31 }, (_, i) => i + 1).map(
                           (day) => (
                             <Button
                               key={day}
                               title={String(day)}
-                              label={`Month day ${day}`}
+                              label={t("Month day {v0}", { v0: day })}
                               active={selector.days.includes(day)}
                               onPress={() =>
                                 setSelector({
@@ -373,14 +389,14 @@ export function TaskEditor({
                   {selector.kind === "ordinal" && (
                     <>
                       <Choices
-                        label="Which occurrence"
+                        label={t("Which occurrence")}
                         value={selector.ordinal}
                         options={[
-                          { value: 1, label: "First" },
-                          { value: 2, label: "Second" },
-                          { value: 3, label: "Third" },
-                          { value: 4, label: "Fourth" },
-                          { value: -1, label: "Last" },
+                          { value: 1, label: t("First") },
+                          { value: 2, label: t("Second") },
+                          { value: 3, label: t("Third") },
+                          { value: 4, label: t("Fourth") },
+                          { value: -1, label: t("Last") },
                         ]}
                         onChange={(ordinal) =>
                           setSelector({
@@ -390,14 +406,17 @@ export function TaskEditor({
                         }
                       />
                       <Choices
-                        label="Weekday"
+                        label={t("Weekday")}
                         value={String(selector.weekday)}
                         options={[
                           ...weekdays.map((name, i) => ({
                             value: String(i + 1),
-                            label: name,
+                            label: t(name),
                           })),
-                          { value: "weekday", label: "Weekday (Mon–Fri)" },
+                          {
+                            value: "weekday",
+                            label: t("Weekday (Mon\u2013Fri)"),
+                          },
                         ]}
                         onChange={(value) =>
                           setSelector({
@@ -410,11 +429,11 @@ export function TaskEditor({
                     </>
                   )}
                   <Choices
-                    label="When a date does not exist"
+                    label={t("When a date does not exist")}
                     value={task.rule.invalidDate}
                     options={[
-                      { value: "clamp", label: "Use last day" },
-                      { value: "skip", label: "Skip that month" },
+                      { value: "clamp", label: t("Use last day") },
+                      { value: "skip", label: t("Skip that month") },
                     ]}
                     onChange={(invalidDate) =>
                       setRule({
@@ -424,18 +443,22 @@ export function TaskEditor({
                   />
                   <Text style={s.muted}>
                     {task.rule.invalidDate === "clamp"
-                      ? "For example, the 31st uses February’s last day. Overlapping dates become one occurrence."
-                      : "For example, the 31st skips February. Skipped dates do not count toward the end count."}
+                      ? t(
+                          "For example, the 31st uses February\u2019s last day. Overlapping dates become one occurrence.",
+                        )
+                      : t(
+                          "For example, the 31st skips February. Skipped dates do not count toward the end count.",
+                        )}
                   </Text>
                 </>
               )}
               <Choices
-                label="Ends"
+                label={t("Ends")}
                 value={task.rule.end.kind}
                 options={[
-                  { value: "never", label: "Never" },
-                  { value: "date", label: "On date" },
-                  { value: "count", label: "After a count" },
+                  { value: "never", label: t("Never") },
+                  { value: "date", label: t("On date") },
+                  { value: "count", label: t("After a count") },
                 ]}
                 onChange={(kind) =>
                   setRule({
@@ -450,7 +473,7 @@ export function TaskEditor({
               />
               {task.rule.end.kind === "date" && (
                 <DateField
-                  label="Last recurrence date"
+                  label={t("Last recurrence date")}
                   value={task.rule.end.date}
                   onChange={(value) =>
                     setRule({ end: { kind: "date", date: value } })
@@ -459,7 +482,7 @@ export function TaskEditor({
               )}
               {task.rule.end.kind === "count" && (
                 <Field
-                  label="Scheduled occurrence count"
+                  label={t("Scheduled occurrence count")}
                   value={String(task.rule.end.count)}
                   keyboardType="number-pad"
                   onChangeText={(value) =>
@@ -469,23 +492,24 @@ export function TaskEditor({
               )}
               <Text style={s.body}>
                 {validRule.success
-                  ? ruleSummary(validRule.data)
-                  : "Check your recurrence choices."}
+                  ? recurrenceText(validRule.data)
+                  : t("Check your recurrence choices.")}
               </Text>
               <Text style={s.muted}>
-                Next dates:{" "}
-                {dates.length
-                  ? dates.map((d) => d.date).join(" · ")
-                  : "No dates within 1900–2100."}
+                {t("Next dates: {v0}", {
+                  v0: dates.length
+                    ? dates.map((d) => d.date).join(" · ")
+                    : t("No dates within 1900\u20132100."),
+                })}
               </Text>
             </View>
           )}
           {task.rule && (
             <View style={s.card}>
               <View style={s.row}>
-                <Text style={[s.label, s.grow]}>Track a streak</Text>
+                <Text style={[s.label, s.grow]}>{t("Track a streak")}</Text>
                 <Switch
-                  accessibilityLabel="Track a streak"
+                  accessibilityLabel={t("Track a streak")}
                   value={!!task.streak}
                   onValueChange={(enabled) =>
                     patch({
@@ -497,19 +521,21 @@ export function TaskEditor({
                 />
               </View>
               <Text style={s.body}>
-                Complete each occurrence before its deadline to keep your
-                streak. Skipping is unavailable.
+                {t(
+                  "Complete each occurrence before its deadline to keep your streak. Skipping is unavailable.",
+                )}
               </Text>
               <Text style={s.muted}>
-                Untimed tasks are due at the end of the day; timed tasks are due
-                at their time plus duration.
+                {t(
+                  "Untimed tasks are due at the end of the day; timed tasks are due at their time plus duration.",
+                )}
               </Text>
             </View>
           )}
           <View style={s.row}>
-            <Text style={[s.label, s.grow]}>Warn me</Text>
+            <Text style={[s.label, s.grow]}>{t("Warn me")}</Text>
             <Switch
-              accessibilityLabel="Warn me"
+              accessibilityLabel={t("Warn me")}
               value={task.reminders.enabled}
               onValueChange={(enabled) =>
                 patch({ reminders: { ...task.reminders, enabled } })
@@ -519,19 +545,22 @@ export function TaskEditor({
           {task.reminders.enabled && (
             <View style={s.card}>
               <Text style={s.muted}>
-                Your choices sync to every device. Allow notifications to
-                schedule local reminders; check Settings for coverage.
+                {t(
+                  "Your choices sync to every device. Allow notifications to schedule local reminders; check Settings for coverage.",
+                )}
               </Text>
               {(["before", "overdue"] as const).map((key) => (
                 <View key={key} style={s.row}>
                   <Text style={[s.body, s.grow]}>
-                    {key === "before" ? "Before the task" : "When overdue"}
+                    {key === "before"
+                      ? t("Before the task")
+                      : t("When overdue")}
                   </Text>
                   <Switch
                     accessibilityLabel={
                       key === "before"
-                        ? "Before-task reminder"
-                        : "Overdue reminder"
+                        ? t("Before-task reminder")
+                        : t("Overdue reminder")
                     }
                     value={task.reminders[key]}
                     onValueChange={(value) =>
@@ -546,7 +575,7 @@ export function TaskEditor({
       )}
       {!!error && (
         <Text accessibilityRole="alert" style={[s.body, s.error]}>
-          {error}
+          {errorMessage(error)}
         </Text>
       )}
     </Sheet>

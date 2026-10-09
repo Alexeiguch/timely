@@ -1,6 +1,8 @@
 # 001 — Retained auth proof and workspace foundation
 
-The initial workspace contained only `initial.md` and `planner-agent-pack/`, with no Git repository or application. Original files are preserved; canonical copies now live under `docs/planner/`.
+Superseded details: native SDK versions below describe the original foundation. Current native peers are Expo SDK 57, recorded in [ADR 007](007-expo-xcode-compatibility.md) and [ADR 011](011-supported-native-peers.md). On 2026-10-08 the owner asked for stale documents to be removed. `initial.md` and `planner-agent-pack/` had diverged from the canonical contracts (streaks, Spanish default, mobile creation and sign-in) and were deleted. `docs/planner/` is the only product contract.
+
+The initial workspace contained only `initial.md` and `planner-agent-pack/`, with no Git repository or application. Those originals were copied to `docs/planner/` and later removed after they stopped matching the maintained contracts.
 
 Use self-hosted Better Auth 1.7.6 with the same-version Expo plugin, mounted in Next.js 16.3.7; Drizzle 0.45.3 and postgres.js 3.4.9 provide real transactions with Neon. No managed Neon Auth or custom token verifier. Automatic email-based provider linking is disabled; explicit authenticated linking remains available.
 

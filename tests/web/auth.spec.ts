@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+test.beforeEach(async ({ context }) => { await context.addInitScript(() => localStorage.setItem("timely-language", "en")); });
 import { randomUUID } from "node:crypto";
 test.beforeEach(async ({ context }) => {
   await context.setExtraHTTPHeaders({
@@ -42,7 +43,7 @@ test("email sign-in, reload restoration and sign-out through the real backend", 
   const content = await (
     await request.get(`http://127.0.0.1:8025/api/v1/message/${message!.ID}`)
   ).json();
-  const otp = content.Text.match(/code is (\d{6})/)?.[1];
+  const otp = content.Text.match(/(?:code is|es) (\d{6})/)?.[1];
   if (!otp) throw new Error("Mail capture did not contain a code");
   // No trace, video or screenshots after entering authentication material.
   await page.getByLabel("Six-digit code").fill(otp);

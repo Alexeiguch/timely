@@ -357,6 +357,8 @@ a {
   display: flex;
   flex-direction: column;
   gap: 40px;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .sidebar .brand {
   text-decoration: none;
@@ -379,20 +381,144 @@ a {
   background: var(--primary);
   color: white;
 }
-.sidebar-note {
+.phrase-carousel {
   margin-top: auto;
-  padding: 24px 16px;
-  background: var(--lime);
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.phrase-viewport {
+  overflow: hidden;
   border-radius: 24px;
-  transform: rotate(-2deg);
+  touch-action: pan-y;
+  overscroll-behavior-x: contain;
+  cursor: grab;
+  user-select: none;
+  box-shadow: 0 10px 24px rgba(20, 41, 77, 0.08);
+  outline: 1px solid rgba(20, 41, 77, 0.08);
+  outline-offset: -1px;
 }
-.sidebar-note > span {
-  font-size: 48px;
+.phrase-viewport:active {
+  cursor: grabbing;
 }
-.sidebar-note p {
+.phrase-track {
+  display: flex;
+  align-items: stretch;
+  will-change: transform;
+}
+.phrase-card {
+  flex: 0 0 100%;
+  min-width: 0;
+  min-height: 156px;
+  padding: 18px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+.phrase-card > span {
+  font-size: 34px;
+  line-height: 1;
+}
+.phrase-card p {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  font-family: "Baloo 2", sans-serif;
+  font-size: 18px;
   font-weight: 700;
-  line-height: 1.5;
-  margin: 8px 0 0;
+  line-height: 1.2;
+}
+.phrase-card p span {
+  font-family: "Nunito Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.phrase-card.tone-lime {
+  background: var(--lime);
+  color: var(--text);
+}
+.phrase-card.tone-paper {
+  background: white;
+  color: var(--text);
+}
+.phrase-card.tone-orange {
+  background: var(--orange);
+  color: var(--text);
+}
+.phrase-card.tone-blue {
+  background: var(--primary);
+  color: white;
+}
+.phrase-card.tone-lime > span,
+.phrase-card.tone-paper > span,
+.phrase-card.tone-orange > span {
+  color: var(--primary);
+}
+.phrase-card.tone-blue > span {
+  color: var(--lime);
+}
+.phrase-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-inline: -8px;
+}
+.phrase-nav > button {
+  width: 40px;
+  min-height: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+}
+.phrase-nav > button:hover {
+  background: rgba(20, 41, 77, 0.06);
+  border-color: transparent;
+  color: var(--text);
+}
+.phrase-nav > button:disabled,
+.phrase-nav > button:disabled:hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+  opacity: 0.45;
+}
+.phrase-dots {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.phrase-dots button {
+  width: 28px;
+  min-height: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  display: grid;
+  place-items: center;
+}
+.phrase-dots button:hover {
+  border-color: transparent;
+  color: inherit;
+}
+.phrase-dots button::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #c5ccbf;
+  transition: width 180ms ease, background 180ms ease;
+}
+.phrase-dots button[aria-current="true"]::before {
+  width: 18px;
+  background: var(--primary);
 }
 .account-email {
   overflow-wrap: anywhere;
@@ -998,8 +1124,21 @@ a {
   .workspace-header h1 {
     font-size: 32px;
   }
-  .sidebar-note {
-    padding: 16px;
+  .phrase-card {
+    min-height: 132px;
+    padding: 14px 12px;
+  }
+  .phrase-card p {
+    font-size: 16px;
+  }
+  .phrase-card p span {
+    font-size: 13px;
+  }
+  .phrase-nav > button {
+    display: none;
+  }
+  .phrase-nav {
+    justify-content: center;
   }
   .workspace-header {
     gap: 16px;
@@ -1024,7 +1163,7 @@ a {
     border-right: 0;
   }
   .sidebar > .brand,
-  .sidebar-note,
+  .phrase-carousel,
   .account-email {
     display: none;
   }
@@ -1205,3 +1344,10 @@ a {
 .streak-indicator small { display: block; line-height: 1.5; }
 .streak-setting { background: #FFF0E2; border-color: #FFBC80; }
 .streak-setting input[type="checkbox"] { width: 20px; height: 20px; accent-color: #1A5FCF; }
+
+.language-choice { margin-block: 12px 20px; }
+.language-choice .row { flex-wrap: wrap; gap: 8px; }
+.language-choice button { min-height: 44px; padding: 8px 14px; font-size: 14px; }
+.language-choice button[aria-pressed="true"] { background: var(--blue, #1A5FCF); color: white; }
+
+.signin > .language-choice { grid-column: 1 / -1; justify-self: end; margin: 0; }

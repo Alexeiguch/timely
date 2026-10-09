@@ -1,3 +1,6 @@
+import { LanguageChoice } from "./language";
+import { t, locale, errorMessage, getLanguage } from "@timely/i18n";
+import { useLanguage } from "./language-state";
 import { useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
@@ -5,7 +8,6 @@ import {
   View,
   Text,
   TextInput,
-  Pressable,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
@@ -17,6 +19,7 @@ import { Brand } from "./brand";
 import { ProviderLogo } from "./provider-logo";
 import { Button } from "./ui";
 function Digit({ char }: { char: string }) {
+  useLanguage();
   const motion = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     let cancel = false;
@@ -72,6 +75,7 @@ import {
   signInGoogle,
 } from "./auth";
 export function SignIn() {
+  useLanguage();
   const googleSignInAvailable = isGoogleSignInAvailable();
   const [providers, setProviders] = useState({ google: false, apple: false });
   const [providerState, setProviderState] = useState("loading");
@@ -143,40 +147,58 @@ export function SignIn() {
     try {
       await action();
     } catch (e) {
-      const code = (e as { code?: string }).code;
+      const code = (
+        e as {
+          code?: string;
+        }
+      ).code;
       setMessage(
         code === "ERR_REQUEST_CANCELED"
-          ? "Sign-in cancelled."
+          ? t("Sign-in cancelled.")
           : e instanceof Error
             ? e.message
-            : "Please try again.",
+            : t("Please try again."),
       );
     } finally {
       setBusy(false);
     }
   }
   async function send(resend = false) {
-    const result = await authClient.emailOtp.sendVerificationOtp({
-      email,
-      type: "sign-in",
-    });
+    const result = await authClient.emailOtp.sendVerificationOtp(
+      {
+        email,
+        type: "sign-in",
+      },
+      { headers: { "x-timely-language": getLanguage() } },
+    );
     if (result.error) throw new Error(result.error.message);
     setSent(true);
     setCooldown(60);
     setOtp("");
-    setMessage(resend ? "A new code is on its way." : "");
+    setMessage(resend ? t("A new code is on its way.") : "");
   }
-  const action = (label: string, fn: () => Promise<void>, disabled = false) => (
-    <Pressable
-      accessibilityRole="button"
+  const action = (
+    label: string,
+    fn: () => Promise<void>,
+    disabled = false,
+    variant: "primary" | "ghost" = "primary",
+  ) => (
+    <Button
+      title={label}
+      variant={variant}
       disabled={busy || disabled}
-      accessibilityState={{ disabled: busy || disabled, busy }}
-      style={({ pressed }) => [s.button, pressed && { opacity: 0.8 }]}
-      onPress={() => run(fn)}
-    >
-      <Text style={s.buttonText}>{label}</Text>
-    </Pressable>
+      loading={busy && variant === "primary"}
+      onPress={() => void run(fn)}
+    />
   );
+  const availableProviders = (["google", "apple"] as const).filter(
+    (provider) => providers[provider],
+  );
+  const feedback = message ? (
+    <Text accessibilityLiveRegion="polite" style={s.caption}>
+      {errorMessage(message)}
+    </Text>
+  ) : null;
   return (
     <SafeAreaView style={s.screen}>
       <KeyboardAvoidingView
@@ -186,163 +208,157 @@ export function SignIn() {
         <ScrollView
           contentContainerStyle={s.content}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
+          <Brand />
+          <Text accessibilityRole="header" style={s.title}>
+            {sent ? t("Enter your code") : t("Make yourself at home.")}
+          </Text>
           {sent ? (
-            <>
-              <Brand />
-              <View style={s.intro}>
-                <Text style={s.title}>Enter your code.</Text>
-                <Text style={s.body}>
-                  We sent six digits to {email}. They expire in 5 minutes.
-                </Text>
-              </View>
-              <View style={s.card}>
-                <Text style={s.heading}>One code, then you’re in</Text>
-                <Text style={s.body}>
-                  We sent six digits to {email}. They expire in 5 minutes.
-                  Type them here, or accept the code suggested from your email.
-                </Text>
-                <Text style={s.label}>Six-digit code</Text>
-                <View style={s.otpField}>
-                  <View style={s.otpRow}>
-                    {Array.from({ length: 6 }, (_, index) => {
-                      const char = shown[index] ?? "";
-                      const active = index === Math.min(otp.length, 5);
-                      return (
-                        <View
-                          key={index}
-                          style={[
-                            s.otpCell,
-                            char ? s.otpFilled : null,
-                            active ? s.otpActive : null,
-                          ]}
-                        >
-                          {char ? (
-                            <Digit key={`${index}-${char}`} char={char} />
-                          ) : null}
-                        </View>
-                      );
-                    })}
-                  </View>
-                  <TextInput
-                    accessibilityLabel="Six-digit code"
-                    value={otp}
-                    onChangeText={(value) =>
-                      setOtp(value.replace(/\D/g, "").slice(0, 6))
-                    }
-                    maxLength={6}
-                    keyboardType="number-pad"
-                    autoComplete="one-time-code"
-                    textContentType="oneTimeCode"
-                    importantForAutofill="yes"
-                    autoFocus
-                    style={s.otpCapture}
-                  />
+            <View style={s.card}>
+              <Text style={s.body}>{t("Sent to {v0}", { v0: email })}</Text>
+              <Text style={s.label}>{t("Six-digit code")}</Text>
+              <View style={s.otpField}>
+                <View style={s.otpRow} accessible={false}>
+                  {Array.from({ length: 6 }, (_, index) => {
+                    const char = shown[index] ?? "";
+                    const active = index === Math.min(otp.length, 5);
+                    return (
+                      <View
+                        key={index}
+                        style={[
+                          s.otpCell,
+                          char ? s.otpFilled : null,
+                          active ? s.otpActive : null,
+                        ]}
+                      >
+                        {char ? (
+                          <Digit key={index + "-" + char} char={char} />
+                        ) : null}
+                      </View>
+                    );
+                  })}
                 </View>
-                <Text style={s.caption}>One number in each box.</Text>
+                <TextInput
+                  accessibilityLabel={t("Six-digit code")}
+                  value={otp}
+                  onChangeText={(value) =>
+                    setOtp(value.replace(/\D/g, "").slice(0, 6))
+                  }
+                  maxLength={6}
+                  keyboardType="number-pad"
+                  autoComplete="one-time-code"
+                  textContentType="oneTimeCode"
+                  importantForAutofill="yes"
+                  autoFocus
+                  style={s.otpCapture}
+                />
+              </View>
+              <Text style={s.caption}>{t("Expires in 5 minutes.")}</Text>
+              {action(
+                "Sign in",
+                async () => {
+                  const result = await authClient.signIn.emailOtp({
+                    email,
+                    otp,
+                  });
+                  if (result.error) throw new Error(result.error.message);
+                },
+                otp.length !== 6,
+              )}
+              {feedback}
+              <View style={s.secondaryActions}>
                 {action(
-                  "Sign in",
-                  async () => {
-                    const result = await authClient.signIn.emailOtp({
-                      email,
-                      otp,
-                    });
-                    if (result.error) throw new Error(result.error.message);
-                  },
-                  otp.length !== 6,
-                )}
-                {action(
-                  cooldown ? `Resend in ${cooldown}s` : "Resend code",
+                  cooldown
+                    ? t("Resend in {v0}s", { v0: cooldown })
+                    : t("Resend code"),
                   () => send(true),
                   cooldown > 0,
+                  "ghost",
                 )}
-                {action("Change email", async () => {
-                  setSent(false);
-                  setOtp("");
-                  setMessage("");
-                })}
-                <Text accessibilityLiveRegion="polite" style={s.caption}>
-                  {busy ? "Just a moment…" : message}
-                </Text>
+                {action(
+                  "Change email",
+                  async () => {
+                    setSent(false);
+                    setOtp("");
+                    setMessage("");
+                  },
+                  false,
+                  "ghost",
+                )}
               </View>
-            </>
+            </View>
           ) : (
-            <>
-          <Brand />
-          <View style={s.intro}>
-            <Text style={s.title}>Make room for what matters.</Text>
-            <Text style={s.body}>
-              Your plans, at your pace. All in one little place.
-            </Text>
-          </View>
-          <View style={s.card}>
-            <Text style={s.heading}>Welcome to your day</Text>
-            <Text style={s.body}>Sign in to keep your plans together.</Text>
-            <View style={s.providers}>
-              {(["google", "apple"] as const).map((provider) => (
-                <Button
-                  key={provider}
-                  title={`Continue with ${provider === "google" ? "Google" : "Apple"}`}
-                  disabled={busy || !providers[provider]}
-                  onPress={() =>
-                    void run(provider === "google" ? signInGoogle : signInApple)
-                  }
-                >
-                  <ProviderLogo provider={provider} />
-                </Button>
-              ))}
-            </View>
-            {(providerState !== "ready" ||
-              !providers.google ||
-              !providers.apple) && (
-              <Text style={s.caption}>
-                {providerState === "loading"
-                  ? "Checking sign-in options…"
-                  : providerState === "error"
-                    ? "Social sign-in is unavailable right now. You can use email."
-                    : !googleSignInAvailable
-                      ? "Google sign-in requires a fresh Timely development build and is not available in Expo Go. Email is ready to use."
-                    : "Some sign-in options aren’t available on this build. Email is ready to use."}
-              </Text>
-            )}
-            {providerState === "error" && (
-              <Button
-                title="Retry sign-in options"
-                variant="ghost"
-                onPress={() => setProviderAttempt((value) => value + 1)}
+            <View style={s.card}>
+              {availableProviders.length > 0 && (
+                <>
+                  <View style={s.providers}>
+                    {availableProviders.map((provider) => (
+                      <Button
+                        key={provider}
+                        title={t("Continue with {v0}", {
+                          v0: provider === "google" ? "Google" : "Apple",
+                        })}
+                        disabled={busy}
+                        onPress={() =>
+                          void run(
+                            provider === "google" ? signInGoogle : signInApple,
+                          )
+                        }
+                      >
+                        <ProviderLogo provider={provider} />
+                      </Button>
+                    ))}
+                  </View>
+                  <View style={s.dividerRow}>
+                    <View style={s.line} />
+                    <Text style={s.caption}>{t("or")}</Text>
+                    <View style={s.line} />
+                  </View>
+                </>
+              )}
+              <Text style={s.label}>{t("Email address")}</Text>
+              <TextInput
+                accessibilityLabel={t("Email address")}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoComplete="email"
+                textContentType="emailAddress"
+                style={s.input}
               />
-            )}
-            <View style={s.dividerRow}>
-              <View style={s.line} />
-              <Text style={s.caption}>or use your email</Text>
-              <View style={s.line} />
+              {action("Send me a code", () => send())}
+              {feedback}
+              {providerState === "error" && (
+                <>
+                  <Text style={s.caption}>
+                    {t("Other sign-in options are unavailable.")}
+                  </Text>
+                  <Button
+                    title={t("Retry other options")}
+                    variant="ghost"
+                    disabled={busy}
+                    onPress={() => setProviderAttempt((value) => value + 1)}
+                  />
+                </>
+              )}
             </View>
-            <Text style={s.label}>Email address</Text>
-            <TextInput
-              accessibilityLabel="Email address"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoComplete="email"
-              textContentType="emailAddress"
-              style={s.input}
-            />
-            {action("Send me a code", () => send())}
-            <Text accessibilityLiveRegion="polite" style={s.caption}>
-              {busy ? "Just a moment…" : message}
-            </Text>
-          </View>
-            </>
           )}
+          <LanguageChoice />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 const s = StyleSheet.create({
-  intro: { gap: 8 },
-  providers: { gap: 12, paddingTop: 8 },
+  providers: { gap: 12 },
+  secondaryActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 8,
+  },
   caption: {
     fontFamily: "NunitoSans",
     fontSize: 14,
@@ -357,20 +373,18 @@ const s = StyleSheet.create({
   },
   line: { flex: 1, height: 1, backgroundColor: surfaces.border },
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 20, gap: 24, paddingBottom: 32 },
-  logo: { fontFamily: "Baloo2", color: colors.primary, fontSize: 36 },
+  content: { padding: 20, gap: 16, paddingBottom: 24 },
   title: {
     fontFamily: "Baloo2",
     color: colors.text,
-    fontSize: 34,
-    lineHeight: 42,
+    fontSize: 32,
+    lineHeight: 40,
   },
-  heading: { fontFamily: "Baloo2", fontSize: 24, color: colors.text },
   body: { fontFamily: "NunitoSans", fontSize: 16, color: colors.muted },
   label: { fontFamily: "NunitoSans", color: colors.text, fontSize: 16 },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 32,
+    borderRadius: 24,
     padding: 20,
     gap: 12,
   },
@@ -388,7 +402,7 @@ const s = StyleSheet.create({
   otpRow: { flexDirection: "row", gap: 8 },
   otpCell: {
     flex: 1,
-    height: 56,
+    minHeight: 56,
     borderWidth: 1,
     borderColor: colors.muted,
     borderRadius: 16,
@@ -405,18 +419,6 @@ const s = StyleSheet.create({
     bottom: 0,
     left: 0,
     color: "transparent",
-    fontSize: 16,
-  },
-  button: {
-    minHeight: 48,
-    backgroundColor: colors.primary,
-    padding: 16,
-    borderRadius: 18,
-    alignItems: "center",
-  },
-  buttonText: {
-    color: colors.surface,
-    fontFamily: "NunitoSansBold",
     fontSize: 16,
   },
 });

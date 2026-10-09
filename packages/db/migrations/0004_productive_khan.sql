@@ -1,0 +1,1 @@
+ALTER TABLE "timely"."notification_devices" ADD COLUMN "environment" text DEFAULT '' NOT NULL;

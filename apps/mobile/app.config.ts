@@ -11,6 +11,7 @@ const scheme =
 const config: ExpoConfig = {
   name: variant === "production" ? "Timely" : `Timely (${variant})`,
   slug: "timely",
+  owner: "guchinale",
   version: "0.1.0",
   scheme,
   icon: "./assets/icon.png",
@@ -53,6 +54,14 @@ const config: ExpoConfig = {
         ]
       : []),
   ] as ExpoConfig["plugins"],
-  extra: { variant },
+  extra: {
+    variant,
+    apiURL: process.env.EXPO_PUBLIC_API_URL,
+    eas: {
+      projectId:
+        process.env.EXPO_PUBLIC_EAS_PROJECT_ID ??
+        "ccd23170-5d7c-4937-8cb1-9a42ab67ccf4",
+    },
+  },
 };
 export default config;

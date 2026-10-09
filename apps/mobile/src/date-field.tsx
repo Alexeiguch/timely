@@ -1,3 +1,5 @@
+import { t, locale } from "@timely/i18n";
+import { useLanguage } from "./language-state";
 import { useState } from "react";
 import { Platform, Text, View } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -19,6 +21,7 @@ export function DateField({
   mode?: "date" | "time";
   onClear?: () => void;
 }) {
+  useLanguage();
   const [open, setOpen] = useState(false);
   const selected = new Date();
   if (mode === "date") {
@@ -37,14 +40,18 @@ export function DateField({
         <Button
           title={
             value && mode === "date"
-              ? formatCivilDate(value, {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })
+              ? formatCivilDate(
+                  value,
+                  {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  },
+                  locale(),
+                )
               : (value ?? (mode === "time" ? "Any time" : "Choose date"))
           }
-          label={`Choose ${label.toLowerCase()}`}
+          label={t("Choose {v0}", { v0: label.toLowerCase() })}
           onPress={() => setOpen(true)}
         >
           {mode === "date" ? (
@@ -55,8 +62,8 @@ export function DateField({
         </Button>
         {value !== null && onClear && (
           <Button
-            title="Clear"
-            label={`Clear ${label.toLowerCase()}`}
+            title={t("Clear")}
+            label={t("Clear {v0}", { v0: label.toLowerCase() })}
             onPress={onClear}
           />
         )}
@@ -65,6 +72,7 @@ export function DateField({
         <>
           <DateTimePicker
             value={selected}
+            locale={locale()}
             mode={mode}
             display={Platform.OS === "ios" ? "spinner" : "default"}
             minimumDate={mode === "date" ? new Date(1900, 0, 1) : undefined}
@@ -80,7 +88,7 @@ export function DateField({
             }}
           />
           {Platform.OS === "ios" && (
-            <Button title="Done" onPress={() => setOpen(false)} />
+            <Button title={t("Done")} onPress={() => setOpen(false)} />
           )}
         </>
       )}

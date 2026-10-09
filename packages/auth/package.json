@@ -17,7 +17,8 @@
     "better-auth": "1.7.6",
     "nodemailer": "7.0.13",
     "resend": "6.31.0",
-    "zod": "4.6.5"
+    "zod": "4.6.5",
+    "@timely/i18n": "workspace:*"
   },
   "devDependencies": {
     "@types/nodemailer": "7.0.11"

@@ -6,6 +6,7 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
 import Constants from "expo-constants";
 import { Platform, TurboModuleRegistry } from "react-native";
+import { acceptedApiUrl } from "./api-url";
 
 const googleSignInNativeModuleName = "RNGoogleSignin";
 
@@ -23,8 +24,16 @@ async function loadGoogleSignIn() {
   return import("@react-native-google-signin/google-signin");
 }
 
-export const apiURL =
-  process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
+// Expo SDK 57's development virtual env merges .env.local over shell values.
+// The manifest retains the API address resolved for this particular dev server.
+const configuredAPIURL: unknown = Constants.expoConfig?.extra?.apiURL;
+const configuredVariant: unknown = Constants.expoConfig?.extra?.variant;
+export const apiURL = acceptedApiUrl(
+  (typeof configuredAPIURL === "string" ? configuredAPIURL : undefined) ??
+    process.env.EXPO_PUBLIC_API_URL ??
+    "http://localhost:3000",
+  configuredVariant,
+);
 const scheme = Constants.expoConfig?.scheme;
 export const authClient = createAuthClient({
   baseURL: apiURL,
@@ -66,12 +75,16 @@ export async function signInApple() {
     return;
   }
   const nonce = Crypto.randomUUID();
+  const hashedNonce = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    nonce,
+  );
   const credential = await AppleAuthentication.signInAsync({
     requestedScopes: [
       AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
       AppleAuthentication.AppleAuthenticationScope.EMAIL,
     ],
-    nonce,
+    nonce: hashedNonce,
   });
   if (!credential.identityToken)
     throw new Error("Apple did not return an identity token");

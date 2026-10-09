@@ -10,7 +10,7 @@
 - Final iOS/Android Hermes exports pass to `/tmp/timely-streaks-native-export`. Native streak runtime/accessibility evidence on signed development builds remains pending; previous native compilation evidence is historical and does not substitute for this gate.
 - No new credentials, dependency versions, SQL migrations or remote release actions.
 
-This document retains chronological milestone evidence, not full planner acceptance. See [implementation-audit.md](implementation-audit.md) for the current 30 September status; earlier pending statements describe the date of their section.
+This document retains chronological milestone evidence, not full planner acceptance. The 30 September table below is historical. Current status is in [progress.md](progress.md) and [implementation-audit.md](implementation-audit.md); earlier pending statements describe the date of their section.
 
 | Check | Result | Environment / evidence |
 | --- | --- | --- |

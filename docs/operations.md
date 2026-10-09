@@ -20,7 +20,7 @@ Planner API throttling is a shared PostgreSQL fixed-minute budget of 180 request
 
 Account deletion requires a real session created within five minutes and explicit confirmation. The server locks the account's sync head, revokes all sessions and cascades owned data. Other accounts remain unchanged. Device unregister affects only the authenticated installation. Sign-out requires sync or confirmed discard when work is pending.
 
-Native cancellation is account/environment scoped. A durable cleanup queue survives account purge and retries on launch. Revoked accounts leave in-memory state even if local cleanup fails. Local reminders reconcile on durable edits, startup, foreground and sync. Settings shows permission, seven-day coverage and the 48-entry budget. A disconnected phone can retain an old OS schedule after a web edit until reconciliation; tapping rechecks current state. Remote delivery remains unimplemented.
+Native cancellation is account/environment scoped. A durable cleanup queue survives account purge and retries on launch. Revoked accounts leave in-memory state even if local cleanup fails. Local reminders reconcile on durable edits, startup, foreground and sync. Settings shows permission, seven-day coverage and the 48-entry budget. A disconnected phone can retain an old OS schedule after a web edit until reconciliation; tapping rechecks current state. Remote dispatch code exists and the owner observed a synthetic remote notification on the development iPhone; hosted worker operation and the full physical delivery/cancellation matrix remain unverified. See [ADR 014](decisions/014-expo-remote-reminders.md).
 
 ## Backup, retention and rollback gates
 

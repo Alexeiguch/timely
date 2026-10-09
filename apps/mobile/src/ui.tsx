@@ -1,3 +1,5 @@
+import { t, locale } from "@timely/i18n";
+import { useLanguage } from "./language-state";
 import type { ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -43,6 +45,7 @@ export function Button({
   style?: StyleProp<ViewStyle>;
   children?: ReactNode;
 }) {
+  useLanguage();
   const filled = active || variant === "primary";
   return (
     <Pressable
@@ -91,6 +94,7 @@ export function IconButton({
   onPress: () => void;
   children: ReactNode;
 }) {
+  useLanguage();
   return (
     <Pressable
       accessibilityRole="button"
@@ -102,7 +106,13 @@ export function IconButton({
     </Pressable>
   );
 }
-export function Field({ label, ...props }: TextInputProps & { label: string }) {
+export function Field({
+  label,
+  ...props
+}: TextInputProps & {
+  label: string;
+}) {
+  useLanguage();
   return (
     <View style={s.field}>
       <Text style={s.label}>{label}</Text>
@@ -124,7 +134,10 @@ export function Choices<T extends string | number>({
 }: {
   label: string;
   value: T;
-  options: Array<{ value: T; label: string }>;
+  options: Array<{
+    value: T;
+    label: string;
+  }>;
   onChange: (value: T) => void;
 }) {
   return (
@@ -167,13 +180,14 @@ export function Segmented<T extends string>({
   options: T[];
   onChange: (value: T) => void;
 }) {
+  useLanguage();
   return (
     <View style={s.segment}>
       {options.map((option) => (
         <Pressable
           key={option}
           accessibilityRole="button"
-          accessibilityLabel={`${label}: ${option}`}
+          accessibilityLabel={`${label}: ${t(option)}`}
           accessibilityState={{ selected: value === option }}
           onPress={() => onChange(option)}
           style={({ pressed }) => [
@@ -183,7 +197,7 @@ export function Segmented<T extends string>({
           ]}
         >
           <Text style={[s.buttonText, value === option && s.activeText]}>
-            {option}
+            {t(option)}
           </Text>
         </Pressable>
       ))}
@@ -201,6 +215,7 @@ export function Sheet({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  useLanguage();
   return (
     <Modal
       visible
@@ -217,7 +232,7 @@ export function Sheet({
             <Text style={[s.section, s.grow]} accessibilityRole="header">
               {title}
             </Text>
-            <IconButton label="Close" onPress={onClose}>
+            <IconButton label={t("Close")} onPress={onClose}>
               <X size={22} color={colors.text} />
             </IconButton>
           </View>

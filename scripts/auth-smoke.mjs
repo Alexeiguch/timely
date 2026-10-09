@@ -14,7 +14,7 @@ assert.equal(sent.status,200,'OTP request must succeed');
 const messages = await (await fetch(mail+'/api/v1/messages')).json();
 const message = messages.messages.find(m=>m.To.some(r=>r.Address===email)); assert.ok(message,'Mailpit captured actual SMTP delivery');
 const content = await (await fetch(mail+'/api/v1/message/'+message.ID)).json();
-const otp = content.Text.match(/code is (\d{6})/)?.[1]; assert.ok(otp,'Delivered message contains an OTP');
+const otp = content.Text.match(/(?:code is|es) (\d{6})/)?.[1]; assert.ok(otp,'Delivered message contains an OTP');
 const wrong = otp === '000000' ? '111111' : '000000';
 const rejected = await post('/api/auth/sign-in/email-otp',{email,otp:wrong});assert.equal(rejected.status,400);
 console.log('PASS invalid email OTP rejected');

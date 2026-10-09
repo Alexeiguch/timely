@@ -12,7 +12,8 @@
     "./schema": "./src/schema.ts",
     "./planner": "./src/planner.ts",
     "./account": "./src/account.ts",
-    "./history": "./src/history.ts"
+    "./history": "./src/history.ts",
+    "./notifications": "./src/notifications.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.3",

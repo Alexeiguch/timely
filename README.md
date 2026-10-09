@@ -75,4 +75,4 @@ pnpm lint
 
 ## Where it stands
 
-Timely is in active development. The web planner and the iOS app can sign in, keep plans on the device, and sync them back. Android on a device, reminders, and a store release are still ahead.
+Timely is in active development. The web planner and the iOS app can sign in, keep plans on the device, and sync them back. Local reminders and Expo remote push are implemented, with remote delivery tested on the development iPhone. Android on a device, hosted reminder delivery, and a store release are still ahead.

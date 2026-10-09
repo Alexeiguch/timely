@@ -57,11 +57,15 @@ Use density adaptations thoughtfully on narrow screens, not arbitrary values eve
 
 **Buttons:** primary blue with white bold text, 18–24 px radius, comfortable horizontal padding and at least a 44 px interactive target (prefer 48 on mobile). Support loading, disabled, pressed, hover and focus states. Do not lower disabled opacity so much that important explanatory text becomes unreadable.
 
+**Mobile planner creation:** use a persistent blue pill labeled **＋ Add task**, positioned at the lower right above the four-destination dock, outside the scrolling content. Use a minimum 56 px target, 16 px bottom clearance and 20 px side clearance inside safe areas. It opens the existing editor for the selected date in Day, Week and Month. Remove the scrolling header's duplicate Add task button. Measure the floating control's actual height and reserve enough list-end padding for the final task to scroll fully above it, including with enlarged text. Empty-state prompts may still offer creation.
+
 **Chips:** full radius, compact high-contrast labels. Make selected weekday/recurrence chips visibly selected through more than hue. A row of chips must wrap or scroll clearly without hiding choices.
 
 **Period control:** three adjacent rounded choices, a clear selected state and stable dimensions. Week/month/date headings must not jump when content changes. Provide keyboard navigation and descriptive accessibility labels.
 
 **Forms:** visible labels, helper/error text, rounded fields and an inline readable summary of date/recurrence/reminder effects. Use progressive disclosure, but essential save behavior must remain obvious. Sheets on mobile respect the keyboard and safe area; dialogs on web trap/restore focus correctly.
+
+**Mobile sign-in:** show the compact brand and the prominent welcome heading **Make yourself at home.**, then available social options with Google first, followed by an “or” divider and the email field and primary action. Omit the divider when no social provider is available. Hide unconfigured providers; keep service-error recovery concise. After sending, replace the welcome heading with **Enter your code** and show one recipient line, the six-digit field, expiry and primary Sign in action. Resend and Change email are secondary text buttons that wrap for large text. Avoid repeated introductions and development configuration explanations. Keep code autofill, accessible labels and keyboard-aware scrolling.
 
 **Progress group:** bold task title, a useful progress number, status legend, horizontal occurrence markers with date labels and an accessible equivalent list. Upcoming, completed, skipped and overdue markers remain distinguishable without color. Expose status and date to assistive technology.
 
@@ -94,3 +98,7 @@ Use small, purposeful animations for completion, card movement, sheet entry and 
 - Check the supplied color values, actual font families/weights, radius and spacing against screenshots. Iterate before calling the visual stage finished.
 
 Dark mode is deferred. Do not invent a second palette before the supplied light design is implemented.
+
+## Language
+
+Spanish is the default on web and mobile. Place a compact Español / English choice on sign-in and in Settings, with a visible selected state and accessible control names. Keep the mobile welcome title and Google-first ordering; the language choice must not push email/code entry behind introductory copy. Persist the choice on the device and apply changes immediately, including date labels, recurrence, streaks, alerts and reminder copy. Preserve user-authored titles and notes. Allow longer Spanish labels to wrap without horizontal overflow or reduced touch targets. See [ADR 013](../decisions/013-spanish-default-localization.md).

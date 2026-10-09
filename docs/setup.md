@@ -64,7 +64,39 @@ CLI installation uses `/Users/alexei/.local/bin/neon` because `/usr/local/lib/no
 
 ## Email delivery
 
-Verify a sender domain in Resend; set server-only `RESEND_API_KEY` and `MAIL_FROM`. Remove capture mode outside local development. Codes expire after five minutes, have five attempts, are stored hashed, and are rate limited server-side. UI resend cooldown is 60 seconds. Do not log OTPs or captured messages.
+Web and mobile sign-in codes are sent by the same Better Auth backend. Resend is the default delivery provider when `MAIL_MODE` is unset, or it can be selected explicitly. Local Mailpit remains an explicit test transport, selected by `MAIL_MODE=capture`, and requires loopback backend/database hosts. A built local app also requires `APP_ENV=local`.
+
+To activate Resend for local simulator/web use:
+
+1. Verify your sending domain in the [Resend dashboard](https://resend.com/docs/dashboard/domains/introduction). DNS changes need the owner's authorization. A development `.local`/`.test` sender cannot deliver real mail.
+2. Create a [Sending access API key](https://resend.com/docs/dashboard/api-keys/introduction) restricted to the verified domain. Add `RESEND_API_KEY` to the ignored `apps/web/.env.local` or the approved backend secret store. Never paste a key into chat or put it in `EXPO_PUBLIC_*`/`NEXT_PUBLIC_*` variables.
+3. Preserve the other backend settings and set:
+
+   ```dotenv
+   MAIL_MODE=resend
+   MAIL_FROM=Timely <signin@your-verified-domain.com>
+   RESEND_API_KEY=your-server-only-key
+   ```
+
+4. Validate configuration without sending mail or printing credentials:
+
+   ```sh
+   node --env-file=apps/web/.env.local --import tsx scripts/check-mail.mjs --resend
+   ```
+
+   This validates local settings, not Resend domain status or actual inbox delivery. Missing configuration fails explicitly; the app never treats it as successful delivery. For capture-mode checks, omit `--resend`.
+5. Restart the backend on port 3001. A built preview needs `pnpm build` after mail-code changes, then `APP_ENV=local BETTER_AUTH_URL=http://localhost:3001 pnpm --filter @timely/web start --port 3001`. Neither mobile credentials nor a native rebuild are needed for the mail provider switch.
+6. Request a code from web or the simulator using your own real inbox, verify the email in Resend's Emails dashboard and in the inbox, then complete sign-in. An API acceptance ID alone is not inbox-delivery evidence. The Mailpit smoke/browser fixtures use synthetic `@example.test` addresses and require capture mode; do not run them against Resend.
+
+For a local end-to-end check without emailing a person, use Resend's [delivery simulator](https://resend.com/docs/dashboard/emails/send-test-emails):
+
+```sh
+TEST_BASE_URL=http://localhost:3001 node --env-file=apps/web/.env.local --import tsx scripts/resend-auth-smoke.mjs
+```
+
+This check sends one message exclusively to a unique `delivered+…@resend.dev` fixture and counts against the email quota. It requires email read access to retrieve that fixture's code; normal application delivery needs only Sending access. It checks real backend sign-in, session restoration, code rejection/reuse and sign-out without printing codes, keys or sessions. Simulator acceptance does not prove delivery to a human inbox. Keep the regular Mailpit/browser suite in capture mode.
+
+Codes expire after five minutes, have five attempts, are stored hashed, and are rate limited server-side. UI resend cooldown is 60 seconds. Sign-in emails include HTML and plain text. Resend sends use its [documented email endpoint](https://resend.com/docs/api-reference/emails/send-email), a ten-second request timeout and a checked acceptance ID. Provider/network failures return a sanitized delivery error without automatic SMTP fallback or raw response logging. No automatic resend is attempted after an uncertain send; request a new code through the existing cooldown flow. Do not log OTPs or captured messages.
 
 ## Native builds and session proof
 
@@ -108,3 +140,56 @@ TEST_BASE_URL=http://localhost:3001 pnpm test:e2e
 `APP_ENV=local` allows capture mail in a built app only when both the backend URL and database URL are loopback hosts. It still sends real SMTP and uses real Better Auth sessions. Hosted production requires Resend configuration. Browser fixtures represent separate synthetic client IPs for the authentication rate limiter and poll for actual mail delivery; no OTP or session token is written to evidence.
 
 Web navigation is Planner / Review / Search / Settings. Review and Search support up to 366 days per query and online snapshot pagination with date/state/priority/series filters. Overdue display covers the preceding year and labels that coverage. Preferences, repair/discard and web drag/reorder are implemented. Native local scheduling is implemented; remote delivery and actual device verification remain open. Native code now includes all four destinations, custom recurrence editing/scopes, scoped delete/Undo, explicit reorder and safe deep links. These additions still need authenticated native runtime verification; see `docs/implementation-audit.md` for the complete remaining work.
+
+## Language testing
+
+Web and mobile start in Spanish. Select English or Español on sign-in or in Settings; the choice is stored on this browser/device and works offline. No new credential, database migration or native module is required. Browser tabs synchronize the choice locally; separate devices choose independently. Task titles and notes are never translated. Sign-in email follows the requesting client's selected language and defaults to Spanish when no language hint is supplied.
+
+Run `pnpm test` for catalogue, persistence and bilingual mail checks. For real browser acceptance without sending human mail, start an isolated capture-mode preview with the existing loopback Docker database/Mailpit configuration:
+
+```sh
+pnpm build
+APP_ENV=local MAIL_MODE=capture BETTER_AUTH_URL=http://localhost:3003 pnpm --filter @timely/web start --port 3003
+TEST_BASE_URL=http://localhost:3003 pnpm test:e2e
+```
+
+The language suite checks Spanish default, both choices, reload/cross-tab persistence, localized OTP and offline edits on desktop and a 320px phone viewport. Existing English regression fixtures explicitly select English. The normal Resend previews on 3001/3002 can stay running separately. See [ADR 013](decisions/013-spanish-default-localization.md) and [mobile debugging](mobile-debugging.md) for the native local development path.
+
+
+## Expo remote notifications
+
+Use the existing linked Expo project `@guchinale/timely` (`ccd23170-5d7c-4937-8cb1-9a42ab67ccf4`). Native `extra.eas.projectId` and backend `EXPO_PUSH_PROJECT_ID` must match. A public project ID is not a credential. Do not add any push provider secret to an `EXPO_PUBLIC_*` variable.
+
+1. Apply migrations 0003/0004 to local development PostgreSQL, not the unrelated root production Neon environment:
+
+   ```sh
+   node --env-file=apps/web/.env.local --import tsx --input-type=module -e 'const u=new URL(process.env.DATABASE_MIGRATION_URL ?? process.env.DATABASE_URL); if(!["localhost","127.0.0.1"].includes(u.hostname)) throw new Error("Local database required"); process.chdir("packages/db"); await import(process.cwd()+"/src/migrate.ts")'
+   ```
+
+2. In ignored server-only `apps/web/.env.local`, set `EXPO_PUSH_ENABLED=true` and `EXPO_PUSH_PROJECT_ID=ccd23170-5d7c-4937-8cb1-9a42ab67ccf4`. Put `EXPO_ACCESS_TOKEN` in that same server file when Expo enhanced push security is enabled; a production process will not send without it. Restart the backend. `GET /api/v1/notifications/config` exposes only enabled/project identity; all device/coverage/test/status mutations require real authentication and enforce the owner. Downloaded `client_secret_*.json` files stay gitignored. Do not commit them or paste them into chat.
+3. Configure provider credentials with the owner's Expo/Apple account:
+
+   ```sh
+   cd apps/mobile
+   pnpm dlx eas-cli@24.12.0 credentials --platform ios
+   ```
+
+   Select `development`, then Push Notifications. Create a key or use the existing downloaded Apple `.p8` with its Key ID and team; upload it to Expo. Never paste the private key into chat, logs or the repository. Creating the key in Apple's website alone does not upload it to Expo. On 2026-10-08 Apple key creation through EAS failed with a maintenance response; the owner then created a key directly in Apple. The owner-provided key was subsequently uploaded and assigned to the development bundle; a real test receipt confirms APNs handoff. Owner-observed remote iPhone delivery passed on the repeated synthetic test. Full task/device-state verification remains pending. Android separately requires FCM v1 credentials and its registered native Firebase configuration; see [Expo setup](https://docs.expo.dev/push-notifications/push-notifications-setup/).
+4. Restart Metro so the dev manifest includes the project ID; use the existing signed development app with push entitlement, not Expo Go. Reconcile from mobile Settings after the device has permission and a real authenticated session. The nearest 48 alerts remain local, with eligible uncovered plans handled remotely. `ready` means coverage registration succeeded; it is not delivery proof.
+5. For a local phone using port 3002, keep its backend/Metro reachable and run the durable development worker from the repository root:
+
+   ```sh
+   APP_ENV=local BETTER_AUTH_URL=http://alexeis-macbook-air.local:3002 node --env-file=apps/web/.env.local --import tsx scripts/push-worker.mjs
+   ```
+
+   Append `--once` for a single reconciliation/dispatch sweep. It logs counts only. The process must stay running to send remote reminders. Hosted production uses the signed Inngest minute cron; see [deployment](deployment.md#remote-reminders-and-compatibility).
+6. In Ajustes → Recordatorios, select **Probar notificación remota** after registration is ready. The authenticated test creates one durable synthetic notification for 30 seconds later (one test/minute/device). Wait for the scheduling acknowledgement before backgrounding or locking the iPhone. Observe the alert; later inspect only its status/receipt. A provider ticket and a successful receipt establish provider acceptance/handoff, not visible delivery. No plan is created or changed by this test.
+
+Regression commands:
+
+```sh
+pnpm test
+RUN_DB_TESTS=1 node --env-file=apps/web/.env.local node_modules/vitest/vitest.mjs run packages/db/src/notifications.integration.test.ts packages/db/src/planner.integration.test.ts
+```
+
+These DB fixtures use synthetic accounts and clean them up. Native delivery, permission changes, cancelled alerts, more-than-48 coverage, offline/terminated/DST/multi-device behavior and hosted worker cadence still need the [physical verification matrix](mobile-verification.md). Local reminders continue to work without APNs/FCM provider keys; remote push requires those credentials.

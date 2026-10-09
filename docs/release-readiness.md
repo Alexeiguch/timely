@@ -23,7 +23,7 @@ CI now defines disposable Postgres/Mailpit services, runs migrations and real tr
 
 ## Independent engineering gates still open
 
-- Remote reminders: notification device tokens/capabilities, coverage handoff, Inngest transactional-outbox processing and due sweep, conservative uncertain-send handling, receipt polling and invalid-token cleanup. Local scheduling is implemented; remote delivery is not enabled or claimed working.
+- Remote reminders: Expo device registration, coverage handoff, transactional-outbox/due reconciliation, uncertain-send protection, receipts and token cleanup are implemented and tested locally. Full physical notification lifecycle/state proof (APNs key uploaded, first test receipt confirms handoff and owner observed the repeated remote iPhone test), Android FCM v1/runtime, hosted signed Inngest cadence/quotas and the full channel/zone/termination matrix remain open. See [ADR 014](decisions/014-expo-remote-reminders.md).
 - Native runtime: equivalent Expo SQLite migration with pending work (SQL logic passes in Node), Android app flows, notification cancellation/delivery and account cleanup in signed development builds. Exports/native compilation do not prove OS presentation.
 - Scale and retention: indexed effective-date projections, canonical journal checkpointing and retained-cursor expiry with a realistic large-account benchmark. Historical projection is bounded/paginated; current UI still reads complete account repositories.
 - Remaining UX: full keyboard/screen-reader/zoom/large-text/gesture matrix, monthly cross-month groups, safe provider link/unlink and exhaustive two-device recurrence conflict fixtures.
@@ -32,8 +32,8 @@ CI now defines disposable Postgres/Mailpit services, runs migrations and real tr
 
 1. Register the self-hosted Google callbacks for local ports 3000/3001 and final staging/production HTTPS origin, then verify real consent and token exchange on web/iOS/Android. Native Google requires registered platform client IDs and Android SHA identities.
 2. Supply Apple App/Service IDs, a current generated client secret and an HTTPS callback; verify first/repeat authorization and private relay on physical iOS plus supported Android browser flow.
-3. Configure a verified Resend sender and API key for hosted mail. Local SMTP evidence does not verify hosted mail.
-4. Choose registered production app identifiers, EAS project/signing credentials and physical iOS/Android test devices; configure push credentials and the eventual Inngest event/signing keys and approved cadence/plan.
+3. Configure Resend secrets in the approved hosted backend and verify a real inbox sign-in. The local backend uses the owner's verified `findmatchuy.com` domain and passes a live Resend simulator sign-in check as of 2026-10-08; human inbox and hosted deployment delivery remain unverified.
+4. Choose registered production app identifiers, EAS project/signing credentials and physical iOS/Android test devices; upload push credentials to the linked Expo project and configure hosted Inngest event/signing keys and approved cadence/plan. Apple EAS key creation returned maintenance; the owner created a key on Apple directly, and that existing key is now uploaded/assigned in Expo. A real test receipt confirms APNs handoff and the owner observed the repeated remote iPhone test. Android FCM v1 and hosted worker verification remain open.
 5. Authorize actual publication, production migrations, DNS changes and store submission only after reviewable release artifacts and the above checks are complete.
 
 ## Recovery
