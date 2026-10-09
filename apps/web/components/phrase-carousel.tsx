@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLanguage } from "./language-state";
 import {
-  resistedOffset,
+  cardOffset,
   settleIndex,
   velocityFrom,
   type PointSample,
@@ -41,7 +41,6 @@ type Drag = {
   pointer: number;
   originX: number;
   originY: number;
-  originOffset: number;
   samples: PointSample[];
   axis: "x" | "y" | null;
 };
@@ -50,81 +49,116 @@ export function PhraseCarousel() {
   useLanguage();
   const count = phrases.length;
   const viewport = useRef<HTMLDivElement>(null);
-  const track = useRef<HTMLDivElement>(null);
+  const cards = useRef<Array<HTMLElement | null>>([]);
   const animation = useRef<Animation | null>(null);
   const offset = useRef(0);
   const index = useRef(0);
+  const front = useRef(0);
   const drag = useRef<Drag | null>(null);
   const [active, setActive] = useState(0);
+  const [frontIndex, setFrontIndex] = useState(0);
+  const [dragging, setDragging] = useState(false);
 
   function width() {
     return viewport.current?.clientWidth ?? 0;
   }
-  function readOffset() {
-    const node = track.current;
+  function reduced() {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+  function pose(x: number) {
+    return `translate3d(${x}px,0,0)`;
+  }
+  function readX(cardIndex: number) {
+    const node = cards.current[cardIndex];
     if (!node) return offset.current;
     const value = getComputedStyle(node).transform;
     if (!value || value === "none") return offset.current;
     return new DOMMatrix(value).m41;
   }
+  function reveal(under: number) {
+    for (let i = 0; i < count; i += 1) {
+      const card = cards.current[i];
+      if (!card) continue;
+      if (i === front.current) {
+        card.style.visibility = "visible";
+        card.style.zIndex = "2";
+      } else if (i === under) {
+        card.style.visibility = "visible";
+        card.style.zIndex = "1";
+      } else {
+        card.style.visibility = "";
+        card.style.zIndex = "";
+      }
+    }
+  }
   function apply(next: number) {
     offset.current = next;
-    if (track.current) track.current.style.transform = `translate3d(${next}px,0,0)`;
+    const node = cards.current[front.current];
+    if (node) node.style.transform = pose(next);
+    const under = next < -0.5 ? front.current + 1 : next > 0.5 ? front.current - 1 : -1;
+    reveal(under);
   }
-  function stop() {
-    const live = readOffset();
-    animation.current?.cancel();
-    animation.current = null;
-    apply(live);
-  }
-  function reduced() {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function showFront(next: number) {
+    for (let i = 0; i < count; i += 1) {
+      const card = cards.current[i];
+      if (!card) continue;
+      card.style.transform = "";
+      card.style.visibility = i === next ? "visible" : "";
+      card.style.zIndex = i === next ? "2" : "";
+    }
+    front.current = next;
+    offset.current = 0;
+    setFrontIndex(next);
   }
   function commit(target: number, velocity = 0) {
-    stop();
+    const fromIndex = front.current;
+    const from = readX(fromIndex);
+    const running = animation.current;
+    animation.current = null;
+    running?.cancel();
     const clamped = Math.max(0, Math.min(count - 1, target));
-    const to = -clamped * width();
-    const from = offset.current;
+    const span = width();
+    const leaving = clamped !== fromIndex;
+    const to = leaving ? (clamped > fromIndex ? -(span + 36) : span + 36) : 0;
     const distance = Math.abs(from - to);
     index.current = clamped;
     setActive(clamped);
-    const node = track.current;
-    if (!node || reduced() || distance < 0.5) {
-      apply(to);
+    setDragging(false);
+    const node = cards.current[fromIndex];
+    if (!node || reduced() || distance < 0.5 || span <= 0) {
+      showFront(clamped);
       return;
     }
+    node.style.transform = pose(from);
+    reveal(leaving ? clamped : -1);
     const duration = Math.min(
-      420,
-      Math.max(140, distance / Math.max(Math.abs(velocity), 0.5)),
+      320,
+      Math.max(160, distance / Math.max(Math.abs(velocity), 0.55)),
     );
-    const running = node.animate(
-      [
-        { transform: `translate3d(${from}px,0,0)` },
-        { transform: `translate3d(${to}px,0,0)` },
-      ],
+    const flying = node.animate(
+      [{ transform: pose(from) }, { transform: pose(to) }],
       {
         duration,
         easing: "cubic-bezier(0.16, 1, 0.3, 1)",
         fill: "forwards",
       },
     );
-    animation.current = running;
-    running.onfinish = () => {
-      if (animation.current !== running) return;
+    animation.current = flying;
+    flying.onfinish = () => {
+      if (animation.current !== flying) return;
       animation.current = null;
-      apply(to);
-      running.cancel();
+      flying.cancel();
+      showFront(clamped);
     };
   }
 
   useEffect(() => {
-    apply(-index.current * width());
+    showFront(front.current);
     const node = viewport.current;
     if (!node) return;
     const observer = new ResizeObserver(() => {
-      if (drag.current?.axis === "x") return;
-      stop();
-      apply(-index.current * width());
+      if (drag.current?.axis === "x" || animation.current) return;
+      showFront(index.current);
     });
     observer.observe(node);
     return () => observer.disconnect();
@@ -133,12 +167,17 @@ export function PhraseCarousel() {
   function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (!event.isPrimary || event.button !== 0) return;
     if (event.pointerType === "mouse") event.preventDefault();
-    stop();
+    if (animation.current) {
+      const running = animation.current;
+      animation.current = null;
+      running.cancel();
+      showFront(index.current);
+    }
+    setDragging(true);
     drag.current = {
       pointer: event.pointerId,
       originX: event.clientX,
       originY: event.clientY,
-      originOffset: offset.current,
       samples: [{ x: event.clientX, t: event.timeStamp }],
       axis: null,
     };
@@ -160,8 +199,7 @@ export function PhraseCarousel() {
     }
     if (current.axis !== "x") return;
     current.samples.push({ x: event.clientX, t: event.timeStamp });
-    const span = width();
-    apply(resistedOffset(current.originOffset + dx, -(count - 1) * span, span));
+    apply(cardOffset(dx, front.current, count, width()));
   }
   function finish(event: React.PointerEvent<HTMLDivElement>) {
     const current = drag.current;
@@ -170,17 +208,21 @@ export function PhraseCarousel() {
       current.samples.push({ x: event.clientX, t: event.timeStamp });
     const velocity = velocityFrom(current.samples);
     const axis = current.axis;
-    const originOffset = current.originOffset;
     drag.current = null;
+    setDragging(false);
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
+    if (axis !== "x") {
+      apply(0);
+      return;
+    }
     const span = width();
     commit(
       settleIndex({
         index: index.current,
         count,
         offset: offset.current,
-        originOffset,
+        originOffset: 0,
         span,
         velocity,
         axis,
@@ -217,7 +259,7 @@ export function PhraseCarousel() {
       onKeyDown={onKeyDown}
     >
       <div
-        className="phrase-viewport"
+        className={`phrase-viewport${dragging ? " is-dragging" : ""}`}
         ref={viewport}
         tabIndex={0}
         aria-label={t("Inspiring phrases")}
@@ -227,23 +269,24 @@ export function PhraseCarousel() {
         onPointerCancel={finish}
         onPointerLeave={onPointerLeave}
       >
-        <div className="phrase-track" ref={track}>
-          {phrases.map((phrase) => (
-            <article
-              key={phrase.title}
-              className={`phrase-card tone-${phrase.tone}`}
-              aria-roledescription={t("slide")}
-              aria-label={`${t(phrase.title)} ${t(phrase.body)}`}
-              aria-hidden={phrase.title !== slide.title}
-            >
-              <span aria-hidden="true">{phrase.mark}</span>
-              <p>
-                {t(phrase.title)}
-                <span>{t(phrase.body)}</span>
-              </p>
-            </article>
-          ))}
-        </div>
+        {phrases.map((phrase, position) => (
+          <article
+            key={phrase.title}
+            ref={(node) => {
+              cards.current[position] = node;
+            }}
+            className={`phrase-card tone-${phrase.tone}${position === frontIndex ? " is-front" : ""}`}
+            aria-roledescription={t("slide")}
+            aria-label={`${t(phrase.title)} ${t(phrase.body)}`}
+            aria-hidden={phrase.title !== slide.title}
+          >
+            <span aria-hidden="true">{phrase.mark}</span>
+            <p>
+              {t(phrase.title)}
+              <span>{t(phrase.body)}</span>
+            </p>
+          </article>
+        ))}
       </div>
       <p className="sr-only" aria-live="polite">
         {t(slide.title)} {t(slide.body)}

@@ -1,11 +1,16 @@
 export type PointSample = { x: number; t: number };
 
-/** Overscroll approaches one viewport width and never reaches it. */
-export function resistedOffset(raw: number, min: number, span: number): number {
-  if (span <= 0) return Math.min(0, Math.max(min, raw));
-  if (raw > 0) return rubber(raw, span);
-  if (raw < min) return min + rubber(raw - min, span);
-  return raw;
+/** The card follows the drag. Pulling past either end resists and stays short of one card. */
+export function cardOffset(
+  dx: number,
+  index: number,
+  count: number,
+  span: number,
+): number {
+  if (span <= 0 || count <= 1) return 0;
+  if (index <= 0 && dx > 0) return rubber(dx, span);
+  if (index >= count - 1 && dx < 0) return rubber(dx, span);
+  return dx;
 }
 
 function rubber(delta: number, span: number): number {
