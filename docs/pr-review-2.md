@@ -56,3 +56,15 @@ Isolated source and executable diagnostic fixtures are at `/tmp/timely-pr2-revie
 ## Next action
 
 Fix findings 1–3 with meaningful failure/queue/performance regressions, resolve PR #2 against current main while preserving the existing working-tree changes, then validate the resulting merged source. The head's passing build cannot establish that a conflicted merge builds. Refresh flagged dependency pins as a separate compatible maintenance change. Do not merge or publish based on this review alone.
+
+## Fix validation — 2026-10-11
+
+PR #2 is now merged into main. The three actionable findings are addressed on the merged implementation:
+
+- Native task transport no longer calls optional push registration. The authenticated task transaction pauses only its owner's uploading installation; invalid batches roll back that pause with the edits. Regression coverage includes both reminder settings, expired authentication, identical installation IDs on two accounts, and transactional rollback.
+- Due selection joins the matching owner/device registration and excludes paused, unpermitted, tokenless and expired jobs. Recovery cancels expired pending jobs even on paused devices. Claims retain transactional readiness/canonical checks. Failed claims do not consume the worker's twenty-dispatch budget.
+- Coverage and worker reconciliation insert missing jobs in bounded batches, group changed statuses, and use keyed lookups. They retain terminal and local ownership. Fifty daily tasks produce 700 seven-day jobs with **11 queries initially, 9 on unchanged repeat coverage, and 9 on unchanged reconciliation**, compared with 711 coverage queries in the review.
+
+Exact dependency updates: Next.js 16.3.8, Vitest 4.1.11, Nodemailer 10.0.9 and domain UUID 11.1.1; the lockfile retains the compatible Expo 57/React Native 0.86.3 set. The updated registry audit has six findings (zero critical, two high, three moderate, one low). Remaining paths are Expo/native tooling (node-forge, braces, legacy xcode UUID, router decoding), Drizzle's legacy esbuild loader and tsx's esbuild. The two high advisories list no patched version. These remaining findings are not represented as fixed or as demonstrated production exploits. Further compatible upstream updates remain maintenance work.
+
+Validation: all 164 unit/SQLite/real PostgreSQL cases pass, ten workspace typechecks pass, client/server import boundaries pass, and the production web build generates all 21 routes. Database tests use a newly created local disposable database; production data and schema are unchanged. Deployment and native build evidence are recorded in the latest progress entry.

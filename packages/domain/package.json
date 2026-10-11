@@ -11,6 +11,6 @@
   "dependencies": {
     "@timely/contracts": "workspace:*",
     "@js-temporal/polyfill": "0.5.1",
-    "uuid": "11.1.0"
+    "uuid": "11.1.1"
   }
 }

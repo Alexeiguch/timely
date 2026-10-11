@@ -11,3 +11,7 @@ Development iOS configuration declares `NSAllowsLocalNetworking=true` with `NSAl
 Bundle the public mobile environment at build time. Use the phone-reachable `.local` backend origin and keep the same origin when updating the installed app, since auth storage is namespaced by origin. No backend secrets are included. The Mac is still needed for local sign-in/sync and remote worker delivery; the app's JavaScript and saved offline plans are independent of Metro after compilation.
 
 Reproduction and EAS environment requirements: [mobile debugging](../mobile-debugging.md#run-on-iphone-without-metro). Actual artifact/install checks are recorded in [progress](../progress.md) and [mobile verification](../mobile-verification.md).
+
+## Hosted backend selection — 2026-10-11
+
+The owner explicitly selected https://timely-mauve-five.vercel.app for the rebuilt iPhone app. Retain the existing development identifier, callback scheme and signing team while embedding this HTTPS origin in the Release configuration. Auth and planner storage are already namespaced by origin; the existing Mac-origin data remains stored separately, and hosted sign-in is required. Do not copy local plans to another backend implicitly. See the Vercel Release build instructions in [mobile debugging](../mobile-debugging.md#release-build-connected-to-vercel).
