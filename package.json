@@ -38,12 +38,12 @@
   "pnpm": {
     "patchedDependencies": {
       "@react-native/dev-middleware@0.86.3": "patches/@react-native__dev-middleware@0.86.3.patch",
-      "expo-modules-core@57.0.20": "patches/expo-modules-core@57.0.20.patch",
-      "expo-modules-jsi@57.1.1": "patches/expo-modules-jsi@57.1.1.patch"
+      "expo-modules-jsi@57.1.1": "patches/expo-modules-jsi@57.1.1.patch",
+      "expo-modules-core@57.0.21": "patches/expo-modules-core@57.0.21.patch"
     },
     "overrides": {
       "@better-auth/utils": "0.4.2",
-      "expo": "57.0.26",
+      "expo": "57.0.27",
       "@expo/metro-runtime": "57.0.16",
       "@expo/dom-webview": "57.0.1",
       "@expo/log-box": "57.0.4",

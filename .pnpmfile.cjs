@@ -3,7 +3,7 @@
 module.exports = {
   hooks: {
     readPackage(pkg) {
-      if ((pkg.name === "expo-router" && pkg.version === "57.0.24") ||
+      if ((pkg.name === "expo-router" && pkg.version === "57.0.25") ||
           (pkg.name === "react-native-drawer-layout" && pkg.version === "4.2.11")) {
         pkg.peerDependencies = { ...pkg.peerDependencies, "react-native-reanimated": "4.5.1" };
       }

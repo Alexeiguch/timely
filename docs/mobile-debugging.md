@@ -116,3 +116,28 @@ For EAS internal distribution, `eas build --platform ios --profile standalone` r
 Expo Tools 1.6.3 attached to the iPhone simulator running the signed Debug configuration. Metro runs on `127.0.0.1:8081`. Reloading the app hit the solid editor breakpoint at `src/brand.tsx:3`, with the original TypeScript source, variables and call stack visible. The session was left paused there for the owner; F5 continues. Remove the sample breakpoint by clicking its gutter marker when finished.
 
 After the Expo SDK 57 / React Native 0.86 upgrade, the development build requested its bundle on IPv4 while Node could bind `localhost` only on IPv6. The checked-in task now forces IPv4 DNS ordering, advertises `127.0.0.1`, and the debugger attaches to that same address. The local Expo Tools repair converts `project.root` from a VS Code URI to the filesystem string required by js-debug, and turbo source maps are disabled because the normal Metro map is the compatible path. Build log: `/tmp/timely-debug-build.log`; screenshot: `evidence/mobile-vscode-debugger.png`.
+
+## Release build connected to Vercel
+
+The owner selected the hosted backend on 2026-10-11. Use the same Release/development identity above, replacing the API value with https://timely-mauve-five.vercel.app. Keep EXPO_NO_DOTENV=1 and load the ignored public mobile configuration through Node so local defaults cannot replace the selected origin.
+
+When the phone is unavailable, compile the Expo-generated native workspace for generic physical iOS with the existing development signing team. From apps/mobile, after prebuild and Pod installation:
+
+~~~sh
+EXPO_PUBLIC_API_URL=https://timely-mauve-five.vercel.app \
+  APP_VARIANT=development EXPO_NO_DOTENV=1 \
+  node --env-file=.env.local -e '
+    const { spawnSync } = require("node:child_process");
+    const result = spawnSync("xcodebuild", [
+      "-workspace", "ios/Timelydevelopment.xcworkspace",
+      "-scheme", "Timelydevelopment", "-configuration", "Release",
+      "-sdk", "iphoneos", "-destination", "generic/platform=iOS",
+      "-derivedDataPath", "/tmp/timely-vercel-ios",
+      "DEVELOPMENT_TEAM=YOUR_EXISTING_TEAM_ID", "CODE_SIGN_STYLE=Automatic",
+      "-allowProvisioningUpdates", "build",
+    ], { stdio: "inherit", env: process.env });
+    process.exit(result.status ?? 1);
+  '
+~~~
+
+Install the resulting Timelydevelopment.app with the existing devicectl command when a registered iPhone reconnects; do not uninstall or clear storage first. The hosted origin has its own auth and planner namespace, so sign in to the hosted account. Plans/auth saved for the Mac origin remain stored separately and are not automatically migrated. This development-signed Release artifact contains its JavaScript and runs without Metro; it is not an App Store distribution.
