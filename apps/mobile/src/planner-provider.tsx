@@ -24,7 +24,6 @@ import {
 import {
   editableTask,
   editorCommand,
-  httpTransport,
   occurrenceTarget,
   saveLocal,
   saveLocalBatch,
@@ -59,6 +58,7 @@ import { authClient, authenticatedFetch, apiURL } from "./auth";
 import { useAccount } from "./account";
 import { localStore, queueNotificationCleanup } from "./local-store";
 import { createPushCoverage, sendPushTest, invalidatePushToken } from "./push";
+import { nativeSyncTransport } from "./sync-transport";
 import { TaskEditor } from "./task-editor";
 import { Button, s } from "./ui";
 import * as Notifications from "expo-notifications";
@@ -167,13 +167,9 @@ export function PlannerProvider({
         store,
         async (path, body) => {
           try {
-            if (path === "sync/push")
-              await pushCoverage.prepare(await store.read(), []);
-            const result = await httpTransport((url, init) =>
-              authenticatedFetch(url, {
-                ...init,
-                headers: { ...init?.headers, "X-Timely-Account": ownerId },
-              }),
+            const result = await nativeSyncTransport(
+              ownerId,
+              authenticatedFetch,
             )(path, body);
             if (alive.current) setNeedsSignIn(false);
             return result;

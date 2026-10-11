@@ -1,6 +1,8 @@
 import { beforeEach, afterEach, afterAll, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
+import * as schema from "./schema";
 import { createDatabase } from "./index";
 import { notificationRepository } from "./notifications";
 import { planner } from "./planner";
@@ -116,6 +118,196 @@ describe.skipIf(process.env.RUN_DB_TESTS !== "1")(
     afterAll(async () => {
       await connection!.client.end();
     });
+    it("pauses only the uploading account's installation, atomically with valid edits", async () => {
+      const f = await create();
+      await prepare(ownerId, input(), projectId);
+      await repo!.commit(
+        ownerId,
+        { deviceId, cursor: f.cursor, entries: [], handled: [] },
+        now,
+      );
+      await sync!.register(otherOwner, {
+        id: deviceId,
+        platform: "ios",
+        zone: "UTC",
+        protocolVersion: 1,
+      });
+      await prepare(
+        otherOwner,
+        { ...input(), token: `ExpoPushToken[other-${otherOwner}]` },
+        projectId,
+      );
+      await repo!.commit(
+        otherOwner,
+        { deviceId, cursor: 0, entries: [], handled: [] },
+        now,
+      );
+      await expect(
+        sync!.push(ownerId, {
+          protocolVersion: 1,
+          deviceId,
+          operations: [operation(f.task.id, { type: "create", task: f.task })],
+        }),
+      ).rejects.toThrow();
+      expect((await repo!.status(ownerId, deviceId)).ready).toBe(true);
+      await expect(
+        sync!.push(ownerId, {
+          protocolVersion: 1,
+          deviceId,
+          operations: [],
+        }),
+      ).rejects.toThrow();
+      expect((await repo!.status(ownerId, deviceId)).ready).toBe(true);
+      await sync!.push(ownerId, {
+        protocolVersion: 1,
+        deviceId,
+        operations: [
+          operation(f.task.id, {
+            type: "edit",
+            target: occurrenceTarget(f.plans[0]!.item),
+            scope: "series",
+            patch: { title: "Uploaded without Expo" },
+            currentDay: "2026-10-08",
+          }),
+        ],
+      });
+      expect((await repo!.status(ownerId, deviceId)).ready).toBe(false);
+      expect((await repo!.status(otherOwner, deviceId)).ready).toBe(true);
+    });
+    it("excludes paused and expired jobs from the global queue and cancels paused expirations", async () => {
+      await prepare(ownerId, input(), projectId);
+      await sync!.register(otherOwner, {
+        id: deviceId,
+        platform: "ios",
+        zone: "UTC",
+        protocolVersion: 1,
+      });
+      await prepare(
+        otherOwner,
+        { ...input(), token: `ExpoPushToken[other-${otherOwner}]` },
+        projectId,
+      );
+      await repo!.commit(
+        otherOwner,
+        { deviceId, cursor: 0, entries: [], handled: [] },
+        now,
+      );
+      const expired = Array.from({ length: 20 }, () => ({
+        ownerId,
+        deviceId,
+        key: randomUUID(),
+        kind: "test",
+        due: now - 120000,
+        expires: now - 60000,
+      }));
+      const paused = Array.from({ length: 20 }, () => ({
+        ownerId,
+        deviceId,
+        key: randomUUID(),
+        kind: "test",
+        due: now - 30000,
+        expires: now + 60000,
+      }));
+      const ready = {
+        ownerId: otherOwner,
+        deviceId,
+        key: randomUUID(),
+        kind: "test",
+        due: now,
+        expires: now + 60000,
+      };
+      await db!.insert(notificationJobs).values([...expired, ...paused, ready]);
+      expect((await repo!.due(now)).map((job) => job.key)).toEqual([ready.key]);
+      const [stale] = await db!
+        .select()
+        .from(notificationJobs)
+        .where(eq(notificationJobs.key, expired[0]!.key));
+      expect(await repo!.claim(stale!, now)).toBeNull();
+      await repo!.recover(now);
+      const rows = await db!
+        .select()
+        .from(notificationJobs)
+        .where(eq(notificationJobs.ownerId, ownerId));
+      expect(rows.filter((job) => job.status === "cancelled")).toHaveLength(20);
+      expect(rows.filter((job) => job.status === "pending")).toHaveLength(20);
+      expect(
+        (await repo!.claim((await repo!.due(now))[0]!, now))?.job.key,
+      ).toBe(ready.key);
+    });
+    it("batches a seven-day recurring horizon and makes unchanged refreshes constant-query", async () => {
+      const tasks = Array.from({ length: 50 }, (_, index) =>
+        taskSchema.parse({
+          id: randomUUID(),
+          title: `Recurring fixture ${index}`,
+          notes: "",
+          priority: null,
+          schedule: { date: "2026-10-08", time: "10:00", duration: null },
+          reminders: { enabled: true, before: true, overdue: true },
+          rule: {
+            frequency: "daily",
+            interval: 1,
+            anchor: "2026-10-08",
+            end: { kind: "never" },
+            invalidDate: "clamp",
+          },
+        }),
+      );
+      const result = await sync!.push(ownerId, {
+        protocolVersion: 1,
+        deviceId,
+        operations: tasks.map((task) =>
+          operation(task.id, { type: "create", task }),
+        ),
+      });
+      await prepare(ownerId, input(), projectId);
+      let queries = 0;
+      const measured = notificationRepository(
+        drizzle(connection!.client, {
+          schema,
+          logger: {
+            logQuery() {
+              queries++;
+            },
+          },
+        }),
+      );
+      const coverage = {
+        deviceId,
+        cursor: result.watermark,
+        entries: [],
+        handled: [],
+      };
+      expect(await measured.commit(ownerId, coverage, now)).toEqual({
+        ready: true,
+        retry: false,
+      });
+      const first = queries;
+      queries = 0;
+      expect(await measured.commit(ownerId, coverage, now)).toEqual({
+        ready: true,
+        retry: false,
+      });
+      const repeat = queries;
+      expect(first).toBeLessThan(25);
+      expect(repeat).toBeLessThan(15);
+      const jobs = await db!
+        .select()
+        .from(notificationJobs)
+        .where(eq(notificationJobs.ownerId, ownerId));
+      expect(jobs).toHaveLength(700);
+      queries = 0;
+      await measured.reconcile(ownerId, now);
+      expect(queries).toBeLessThan(15);
+      expect(
+        await db!
+          .select()
+          .from(notificationJobs)
+          .where(eq(notificationJobs.ownerId, ownerId)),
+      ).toHaveLength(700);
+      console.info(
+        `Coverage regression: first=${first}, repeat=${repeat}, reconcile=${queries}, jobs=${jobs.length}`,
+      );
+    });
     it("isolates device registration by authenticated owner, platform, project and token binding", async () => {
       await expect(prepare(otherOwner, input(), projectId)).rejects.toThrow(
         "Register this mobile",
@@ -140,17 +332,38 @@ describe.skipIf(process.env.RUN_DB_TESTS !== "1")(
     });
     it("queues only owner-ready synthetic tests and enforces the per-device cooldown", async () => {
       const f = await create();
-      await expect(repo!.test(otherOwner, deviceId)).rejects.toThrow("Register this mobile");
+      await expect(repo!.test(otherOwner, deviceId)).rejects.toThrow(
+        "Register this mobile",
+      );
       await prepare(ownerId, input(), projectId);
-      await expect(repo!.test(ownerId, deviceId)).rejects.toThrow("Enable remote reminders");
-      await repo!.commit(ownerId, {deviceId, cursor:f.cursor, entries:[], handled:[]}, now);
-      const testNow=Date.now();
-      expect(await repo!.test(ownerId, deviceId, testNow)).toEqual({queued:true, delaySeconds:30});
-      const [job]=await db!.select().from(notificationJobs).where(and(eq(notificationJobs.ownerId,ownerId),eq(notificationJobs.kind,"test")));
-      expect(job?.due).toBe(testNow+30000);
-      expect(await repo!.claim(job!,testNow+1000)).toBeNull();
-      await expect(repo!.test(ownerId,deviceId,testNow+1000)).rejects.toThrow("Wait a minute");
-      expect((await repo!.claim(job!,testNow+31000))?.item).toBeNull();
+      await expect(repo!.test(ownerId, deviceId)).rejects.toThrow(
+        "Enable remote reminders",
+      );
+      await repo!.commit(
+        ownerId,
+        { deviceId, cursor: f.cursor, entries: [], handled: [] },
+        now,
+      );
+      const testNow = Date.now();
+      expect(await repo!.test(ownerId, deviceId, testNow)).toEqual({
+        queued: true,
+        delaySeconds: 30,
+      });
+      const [job] = await db!
+        .select()
+        .from(notificationJobs)
+        .where(
+          and(
+            eq(notificationJobs.ownerId, ownerId),
+            eq(notificationJobs.kind, "test"),
+          ),
+        );
+      expect(job?.due).toBe(testNow + 30000);
+      expect(await repo!.claim(job!, testNow + 1000)).toBeNull();
+      await expect(
+        repo!.test(ownerId, deviceId, testNow + 1000),
+      ).rejects.toThrow("Wait a minute");
+      expect((await repo!.claim(job!, testNow + 31000))?.item).toBeNull();
     });
     it("protects local ownership, pauses handoff and blocks local takeover after remote claim", async () => {
       const f = await create();

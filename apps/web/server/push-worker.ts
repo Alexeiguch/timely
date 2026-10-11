@@ -13,10 +13,13 @@ export async function runPushWorker(
   const owners = await repository.owners(now);
   for (const ownerId of owners) await repository.reconcile(ownerId, now);
   let sent = 0,
-    receipts = 0;
-  for (const job of (await repository.due(now)).slice(0, 20)) {
+    receipts = 0,
+    dispatches = 0;
+  for (const job of await repository.due(now)) {
+    if (dispatches >= 20) break;
     const claimed = await repository.claim(job, now);
     if (!claimed?.push.token) continue;
+    dispatches++;
     const language = parseLanguage(claimed.push.language);
     const body = claimed.item
       ? reminderBody(claimed.item, job.kind as "before" | "overdue")

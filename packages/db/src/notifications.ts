@@ -1,5 +1,15 @@
 import { createHash, randomUUID } from "node:crypto";
-import { and, asc, eq, gt, inArray, isNull, lte } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  or,
+} from "drizzle-orm";
 import {
   notificationRegistrationSchema,
   notificationCoverageSchema,
@@ -89,6 +99,36 @@ function jobValues(
     due: entry.plan.due,
     expires: entry.expires,
   };
+}
+async function insertJobs(
+  tx: Tx,
+  jobs: (typeof t.notificationJobs.$inferInsert)[],
+) {
+  for (let start = 0; start < jobs.length; start += 500)
+    await tx
+      .insert(t.notificationJobs)
+      .values(jobs.slice(start, start + 500))
+      .onConflictDoNothing();
+}
+async function updateJobStatuses(
+  tx: Tx,
+  ownerId: string,
+  deviceId: string,
+  statuses: Map<string, string[]>,
+) {
+  for (const [status, keys] of statuses)
+    for (let start = 0; start < keys.length; start += 500)
+      await tx
+        .update(t.notificationJobs)
+        .set({ status })
+        .where(
+          and(
+            eq(t.notificationJobs.ownerId, ownerId),
+            eq(t.notificationJobs.deviceId, deviceId),
+            inArray(t.notificationJobs.key, keys.slice(start, start + 500)),
+            inArray(t.notificationJobs.status, reversible),
+          ),
+        );
 }
 export function notificationRepository(db: DB = database()) {
   return {
@@ -258,70 +298,65 @@ export function notificationRepository(db: DB = database()) {
             and(
               eq(t.notificationJobs.ownerId, ownerId),
               eq(t.notificationJobs.deviceId, value.deviceId),
+              or(
+                inArray(t.notificationJobs.status, reversible),
+                desired.size
+                  ? inArray(t.notificationJobs.key, [...desired.keys()])
+                  : undefined,
+              ),
             ),
           );
+        const priorByKey = new Map(existing.map((job) => [job.key, job]));
         const claimed = new Set(value.entries.map((entry) => entry.key));
+        const handled = new Set(value.handled);
         for (const entry of value.entries) {
-          if (
-            existing.some(
-              (job) => job.key === entry.key && committed.includes(job.status),
-            )
-          )
+          const prior = priorByKey.get(entry.key);
+          if (prior && committed.includes(prior.status))
             return { ready: false, retry: true };
         }
-        for (const entry of candidates) {
-          const prior = existing.find((job) => job.key === entry.key);
-          // Never invent a before alert whose intended time has already passed.
-          if (
-            !prior &&
-            entry.plan.kind === "before" &&
-            entry.plan.due <= now &&
-            !claimed.has(entry.key)
-          )
-            continue;
-          await tx
-            .insert(t.notificationJobs)
-            .values({
-              ...jobValues(ownerId, value.deviceId, entry),
-              status: claimed.has(entry.key) ? "local" : "pending",
-            })
-            .onConflictDoNothing();
-          if (claimed.has(entry.key))
-            await tx
-              .update(t.notificationJobs)
-              .set({ status: "local" })
-              .where(
-                and(
-                  eq(t.notificationJobs.ownerId, ownerId),
-                  eq(t.notificationJobs.deviceId, value.deviceId),
-                  eq(t.notificationJobs.key, entry.key),
-                  inArray(t.notificationJobs.status, reversible),
+        await insertJobs(
+          tx,
+          candidates
+            .filter(
+              (entry) =>
+                !priorByKey.has(entry.key) &&
+                !(
+                  entry.plan.kind === "before" &&
+                  entry.plan.due <= now &&
+                  !claimed.has(entry.key)
                 ),
-              );
-        }
+            )
+            .map((entry) => ({
+              ...jobValues(ownerId, value.deviceId, entry),
+              status:
+                handled.has(entry.key) && entry.plan.due <= now
+                  ? "handled"
+                  : claimed.has(entry.key)
+                    ? "local"
+                    : "pending",
+            })),
+        );
+        const statuses = new Map<string, string[]>();
         for (const job of existing) {
           if (!reversible.includes(job.status) || job.kind === "test") continue;
           const status = !desired.has(job.key)
             ? "cancelled"
-            : value.handled.includes(job.key) && job.due <= now
+            : handled.has(job.key) && job.due <= now
               ? "handled"
-              : job.status === "local" && !claimed.has(job.key)
-                ? job.due <= now
-                  ? "handled"
-                  : "pending"
-                : null;
-          if (status)
-            await tx
-              .update(t.notificationJobs)
-              .set({ status })
-              .where(
-                and(
-                  eq(t.notificationJobs.ownerId, ownerId),
-                  eq(t.notificationJobs.deviceId, value.deviceId),
-                  eq(t.notificationJobs.key, job.key),
-                ),
-              );
+              : claimed.has(job.key)
+                ? "local"
+                : job.status === "local"
+                  ? job.due <= now
+                    ? "handled"
+                    : "pending"
+                  : job.status;
+          if (status !== job.status) {
+            const keys = statuses.get(status) ?? [];
+            keys.push(job.key);
+            statuses.set(status, keys);
+          }
         }
+        await updateJobStatuses(tx, ownerId, value.deviceId, statuses);
         const ready = push.permission === "granted" && !!push.token;
         await tx
           .update(t.notificationDevices)
@@ -446,28 +481,39 @@ export function notificationRepository(db: DB = database()) {
               and(
                 eq(t.notificationJobs.ownerId, ownerId),
                 eq(t.notificationJobs.deviceId, device.id),
-                inArray(t.notificationJobs.status, reversible),
+                or(
+                  inArray(t.notificationJobs.status, reversible),
+                  desired.size
+                    ? inArray(t.notificationJobs.key, [...desired])
+                    : undefined,
+                ),
               ),
             );
-          for (const entry of candidates) {
-            if (entry.plan.kind === "before" && entry.plan.due <= now) continue;
-            await tx
-              .insert(t.notificationJobs)
-              .values(jobValues(ownerId, device.id, entry))
-              .onConflictDoNothing();
-          }
-          for (const job of existing)
-            if (job.kind !== "test" && !desired.has(job.key))
-              await tx
-                .update(t.notificationJobs)
-                .set({ status: "cancelled" })
-                .where(
-                  and(
-                    eq(t.notificationJobs.ownerId, ownerId),
-                    eq(t.notificationJobs.deviceId, device.id),
-                    eq(t.notificationJobs.key, job.key),
-                  ),
-                );
+          const priorKeys = new Set(existing.map((job) => job.key));
+          await insertJobs(
+            tx,
+            candidates
+              .filter(
+                (entry) =>
+                  !priorKeys.has(entry.key) &&
+                  !(entry.plan.kind === "before" && entry.plan.due <= now),
+              )
+              .map((entry) => jobValues(ownerId, device.id, entry)),
+          );
+          const cancelled = existing
+            .filter(
+              (job) =>
+                reversible.includes(job.status) &&
+                job.kind !== "test" &&
+                !desired.has(job.key),
+            )
+            .map((job) => job.key);
+          await updateJobStatuses(
+            tx,
+            ownerId,
+            device.id,
+            new Map([["cancelled", cancelled]]),
+          );
           await tx
             .update(t.notificationDevices)
             .set({ plannedThrough: now + 7 * 86400000 })
@@ -494,18 +540,30 @@ export function notificationRepository(db: DB = database()) {
       });
     },
     async due(now = Date.now()) {
-      return db
-        .select()
+      const rows = await db
+        .select({ job: t.notificationJobs })
         .from(t.notificationJobs)
+        .innerJoin(
+          t.notificationDevices,
+          and(
+            eq(t.notificationDevices.ownerId, t.notificationJobs.ownerId),
+            eq(t.notificationDevices.deviceId, t.notificationJobs.deviceId),
+          ),
+        )
         .where(
           and(
             eq(t.notificationJobs.status, "pending"),
             lte(t.notificationJobs.due, now),
             lte(t.notificationJobs.nextAttempt, now),
+            gt(t.notificationJobs.expires, now),
+            eq(t.notificationDevices.ready, true),
+            eq(t.notificationDevices.permission, "granted"),
+            isNotNull(t.notificationDevices.token),
           ),
         )
-        .orderBy(asc(t.notificationJobs.due))
+        .orderBy(asc(t.notificationJobs.due), asc(t.notificationJobs.key))
         .limit(100);
+      return rows.map((row) => row.job);
     },
     async claim(job: NotificationJob, now = Date.now()) {
       return db.transaction(async (tx) => {
@@ -530,6 +588,19 @@ export function notificationRepository(db: DB = database()) {
               eq(t.notificationDevices.deviceId, job.deviceId),
             ),
           );
+        if (current?.status === "pending" && current.expires <= now) {
+          await tx
+            .update(t.notificationJobs)
+            .set({ status: "cancelled" })
+            .where(
+              and(
+                eq(t.notificationJobs.ownerId, job.ownerId),
+                eq(t.notificationJobs.deviceId, job.deviceId),
+                eq(t.notificationJobs.key, job.key),
+              ),
+            );
+          return null;
+        }
         if (
           !current ||
           current.status !== "pending" ||
@@ -675,6 +746,15 @@ export function notificationRepository(db: DB = database()) {
         );
     },
     async recover(now = Date.now()) {
+      await db
+        .update(t.notificationJobs)
+        .set({ status: "cancelled" })
+        .where(
+          and(
+            eq(t.notificationJobs.status, "pending"),
+            lte(t.notificationJobs.expires, now),
+          ),
+        );
       // A crash after provider acceptance is ambiguous. Never retry that visible send automatically.
       await db
         .update(t.notificationJobs)

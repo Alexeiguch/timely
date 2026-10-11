@@ -19,17 +19,15 @@ function fixture() {
     owners: vi.fn().mockResolvedValue([job.ownerId]),
     reconcile: vi.fn().mockResolvedValue(undefined),
     due: vi.fn().mockResolvedValue([job]),
-    claim: vi
-      .fn()
-      .mockResolvedValue({
-        job,
-        item: null,
-        push: {
-          token: "ExpoPushToken[synthetic-worker]",
-          language: "es",
-          environment: "https://staging.example.test",
-        },
-      }),
+    claim: vi.fn().mockResolvedValue({
+      job,
+      item: null,
+      push: {
+        token: "ExpoPushToken[synthetic-worker]",
+        language: "es",
+        environment: "https://staging.example.test",
+      },
+    }),
     finish: vi.fn().mockResolvedValue(undefined),
     receipts: vi.fn().mockResolvedValue([]),
     postponeReceipt: vi.fn().mockResolvedValue(undefined),
@@ -131,4 +129,25 @@ it("waits for missing receipts and applies invalid device results to the origina
     { status: "failed", error: "DeviceNotRegistered" },
     now,
   );
+});
+
+it("does not spend the dispatch budget on jobs paused between selection and claim", async () => {
+  const f = fixture();
+  f.repo.due.mockResolvedValue(
+    Array.from({ length: 21 }, () => ({ ...f.job, key: randomUUID() })),
+  );
+  for (let index = 0; index < 20; index++)
+    f.repo.claim.mockResolvedValueOnce(null);
+  expect((await f.run()).sent).toBe(1);
+  expect(f.repo.claim).toHaveBeenCalledTimes(21);
+  expect(f.provider.send).toHaveBeenCalledTimes(1);
+});
+it("keeps the provider dispatch limit at twenty successful claims", async () => {
+  const f = fixture();
+  f.repo.due.mockResolvedValue(
+    Array.from({ length: 21 }, () => ({ ...f.job, key: randomUUID() })),
+  );
+  expect((await f.run()).sent).toBe(20);
+  expect(f.repo.claim).toHaveBeenCalledTimes(20);
+  expect(f.provider.send).toHaveBeenCalledTimes(20);
 });

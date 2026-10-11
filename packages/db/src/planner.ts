@@ -85,6 +85,17 @@ export function planner(db: DB = database()) {
             "FORBIDDEN",
             "Register this device before synchronizing.",
           );
+        // Pause this installation's remote handoff atomically with its edits.
+        // Uploading tasks must never depend on Expo token/config availability.
+        await tx
+          .update(t.notificationDevices)
+          .set({ ready: false })
+          .where(
+            and(
+              eq(t.notificationDevices.ownerId, ownerId),
+              eq(t.notificationDevices.deviceId, batch.deviceId),
+            ),
+          );
         const results: Outcome[] = [];
         for (const authored of batch.operations) {
           const digest = fingerprint(authored);
