@@ -7,6 +7,7 @@ import {
   newTask,
   periodWindow,
   recurrencePreset,
+  selectedRecurrencePreset,
 } from "./planner";
 import { expand, occurrence, preview } from "./recurrence";
 it("keeps month navigation and projection inside the supported civil calendar", () => {
@@ -47,6 +48,32 @@ it("uses the same recurrence engine for presets, invalid-date preview and emitte
     "2026-10-05",
     "2026-10-06",
   ]);
+});
+it("restores the weekdays choice after saving and distinguishes customized weekly rules", () => {
+  const rule = recurrencePreset("weekdays", "2026-10-09")!;
+  expect(selectedRecurrencePreset(JSON.parse(JSON.stringify(rule)))).toBe(
+    "weekdays",
+  );
+  expect(preview(rule, rule.anchor, 6).map((slot) => slot.date)).toEqual([
+    "2026-10-09",
+    "2026-10-12",
+    "2026-10-13",
+    "2026-10-14",
+    "2026-10-15",
+    "2026-10-16",
+  ]);
+  if (rule.frequency !== "weekly") throw new Error("Expected weekly rule");
+  expect(selectedRecurrencePreset({ ...rule, weekdays: [5, 3, 1, 4, 2] })).toBe(
+    "weekdays",
+  );
+  expect(selectedRecurrencePreset({ ...rule, interval: 2 })).toBe("weekly");
+  expect(selectedRecurrencePreset({ ...rule, weekdays: [1, 3, 5] })).toBe(
+    "weekly",
+  );
+  expect(
+    selectedRecurrencePreset(recurrencePreset("weekly", rule.anchor)),
+  ).toBe("weekly");
+  expect(selectedRecurrencePreset(null)).toBe("none");
 });
 it("sorts by civil date, timed start, then saved manual order without priority reshuffling", () => {
   const task = newTask(randomUUID(), "2026-09-29");

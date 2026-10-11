@@ -49,7 +49,7 @@ export function DateField({
                   },
                   locale(),
                 )
-              : (value ?? (mode === "time" ? "Any time" : "Choose date"))
+              : (value ?? (mode === "time" ? t("Any time") : t("Choose date")))
           }
           label={t("Choose {v0}", { v0: label.toLowerCase() })}
           onPress={() => setOpen(true)}

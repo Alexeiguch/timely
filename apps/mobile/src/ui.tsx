@@ -17,7 +17,11 @@ import {
   type ViewStyle,
 } from "react-native";
 import { X, Check } from "lucide-react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import {
   colors,
   surfaces,
@@ -89,18 +93,26 @@ export function IconButton({
   label,
   onPress,
   children,
+  disabled = false,
 }: {
   label: string;
   onPress: () => void;
   children: ReactNode;
+  disabled?: boolean;
 }) {
   useLanguage();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [s.iconButton, pressed && s.pressed]}
+      style={({ pressed }) => [
+        s.iconButton,
+        disabled && s.disabled,
+        pressed && s.pressed,
+      ]}
     >
       {children}
     </Pressable>
@@ -216,37 +228,45 @@ export function Sheet({
   footer?: ReactNode;
 }) {
   useLanguage();
+  const insets = useSafeAreaInsets();
   return (
     <Modal
       visible
       animationType="none"
-      presentationStyle="pageSheet"
+      transparent
+      presentationStyle="overFullScreen"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={s.screen}>
-        <KeyboardAvoidingView
-          style={s.screen}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-          <View style={s.sheetHeader}>
-            <Text style={[s.section, s.grow]} accessibilityRole="header">
-              {title}
-            </Text>
-            <IconButton label={t("Close")} onPress={onClose}>
-              <X size={22} color={colors.text} />
-            </IconButton>
-          </View>
-          <ScrollView
-            contentContainerStyle={s.page}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            automaticallyAdjustKeyboardInsets
-          >
-            {children}
-          </ScrollView>
-          {footer && <View style={s.sheetFooter}>{footer}</View>}
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+      <SafeAreaProvider>
+        <SafeAreaView edges={["top", "left", "right"]} style={s.sheetBackdrop}>
+          <SafeAreaView edges={["bottom"]} style={[s.screen, s.sheetSurface]}>
+            <KeyboardAvoidingView
+              style={s.screen}
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              keyboardVerticalOffset={insets.top}
+            >
+              <View style={s.sheetHeader}>
+                <Text style={[s.section, s.grow]} accessibilityRole="header">
+                  {title}
+                </Text>
+                <IconButton label={t("Close")} onPress={onClose}>
+                  <X size={22} color={colors.text} />
+                </IconButton>
+              </View>
+              <ScrollView
+                style={s.sheetScroll}
+                contentContainerStyle={s.page}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                automaticallyAdjustKeyboardInsets={false}
+              >
+                {children}
+              </ScrollView>
+              {footer && <View style={s.sheetFooter}>{footer}</View>}
+            </KeyboardAvoidingView>
+          </SafeAreaView>
+        </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 }
@@ -375,6 +395,14 @@ export const s = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: surfaces.border,
   },
+  sheetBackdrop: { flex: 1, backgroundColor: "rgba(20, 41, 77, 0.25)" },
+  sheetSurface: {
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderCurve: "continuous",
+    overflow: "hidden",
+  },
+  sheetScroll: { flex: 1 },
   sheetFooter: {
     paddingHorizontal: 20,
     paddingVertical: 12,

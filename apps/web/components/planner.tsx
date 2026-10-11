@@ -4,7 +4,14 @@ import { PhraseCarousel } from "./phrase-carousel";
 import { t, locale, errorMessage, type Parameters } from "@timely/i18n";
 import { useLanguage } from "./language-state";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type TouchEvent,
+  type MouseEvent,
+} from "react";
 import {
   CalendarDays,
   ChevronLeft,
@@ -123,6 +130,7 @@ export function Planner({
     x: number;
     y: number;
   } | null>(null);
+  const consumedSwipe = useRef(false);
   const planner = usePlanner(identity.id);
   const { grouped, firstWeekday } = planner.preferences;
   useEffect(() => {
@@ -409,6 +417,44 @@ export function Planner({
   function movePeriod(direction: number) {
     setSelected(adjacentPeriod(selected, mode, direction));
   }
+  const swipeHandlers = {
+    onTouchStart: (event: TouchEvent<HTMLDivElement>) => {
+      consumedSwipe.current = false;
+      const touch = event.touches[0];
+      swipe.current =
+        touch && event.touches.length === 1
+          ? { x: touch.clientX, y: touch.clientY }
+          : null;
+    },
+    onTouchCancel: () => {
+      swipe.current = null;
+    },
+    onTouchEnd: (event: TouchEvent<HTMLDivElement>) => {
+      const start = swipe.current;
+      const touch = event.changedTouches[0];
+      swipe.current = null;
+      if (!start || !touch) return;
+      const dx = touch.clientX - start.x;
+      const dy = touch.clientY - start.y;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 2) {
+        consumedSwipe.current = true;
+        movePeriod(dx < 0 ? 1 : -1);
+      }
+    },
+    onClickCapture: (event: MouseEvent<HTMLDivElement>) => {
+      if (consumedSwipe.current) {
+        event.preventDefault();
+        event.stopPropagation();
+        consumedSwipe.current = false;
+      }
+    },
+  };
+  const monthCounts = new Map<string, number>();
+  for (const item of all)
+    monthCounts.set(
+      item.schedule.date,
+      (monthCounts.get(item.schedule.date) ?? 0) + 1,
+    );
   const streaks = useMemo(
     () => streakSummaries(planner.records, zone, now),
     [planner.records, zone, now],
@@ -708,26 +754,7 @@ export function Planner({
                 </label>
               </div>
             </section>
-            <div
-              className="period-heading"
-              onTouchStart={(event) => {
-                const touch = event.touches[0];
-                if (touch)
-                  swipe.current = { x: touch.clientX, y: touch.clientY };
-              }}
-              onTouchEnd={(event) => {
-                const touch = event.changedTouches[0];
-                const start = swipe.current;
-                swipe.current = null;
-                if (
-                  touch &&
-                  start &&
-                  Math.abs(touch.clientX - start.x) > 60 &&
-                  Math.abs(touch.clientY - start.y) < 35
-                )
-                  movePeriod(touch.clientX < start.x ? 1 : -1);
-              }}
-            >
+            <div className="period-heading" {...swipeHandlers}>
               <div>
                 <p className="muted">
                   {mode === "Day"
@@ -770,7 +797,11 @@ export function Planner({
             )}
             {mode === "Month" && (
               <>
-                <div className="month-grid" aria-label={t("Month dates")}>
+                <div
+                  className="month-grid"
+                  aria-label={t("Month dates")}
+                  {...swipeHandlers}
+                >
                   {Array.from(
                     { length: 7 },
                     (_, i) =>
@@ -784,6 +815,7 @@ export function Planner({
                   ))}
                   {Array.from({ length: date(from).daysInMonth }, (_, i) => {
                     const day = addDays(from, i);
+                    const count = monthCounts.get(day) ?? 0;
                     return (
                       <button
                         key={day}
@@ -801,26 +833,28 @@ export function Planner({
                         }
                         aria-label={t("{v0}, {v1} tasks", {
                           v0: label(day, { day: "numeric", month: "long" }),
-                          v1: all.filter((item) => item.schedule.date === day)
-                            .length,
+                          v1: count,
                         })}
-                        className={day === currentDay ? "is-today" : ""}
+                        className={`${day === currentDay ? "is-today" : ""}${count ? " has-tasks" : ""}`}
                         onClick={() => {
                           setSelected(day);
                           setMode("Day");
                         }}
                       >
                         <b>{i + 1}</b>
-                        <span>
-                          {all.filter((item) => item.schedule.date === day)
-                            .length
-                            ? "•"
-                            : " "}
+                        <span
+                          className={count ? "task-count" : ""}
+                          aria-hidden="true"
+                        >
+                          {count || " "}
                         </span>
                       </button>
                     );
                   })}
                 </div>
+                <small className="muted">
+                  {t("Highlighted dates have tasks. Swipe to change month.")}
+                </small>
                 <div className="row group-control">
                   <h3>{t("Your plans")}</h3>
                   <button

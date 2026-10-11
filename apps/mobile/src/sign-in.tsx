@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, surfaces } from "@timely/design";
 import { Brand } from "./brand";
 import { ProviderLogo } from "./provider-logo";
+import { PlannerDoodle } from "./doodle";
 import { Button } from "./ui";
 function Digit({ char }: { char: string }) {
   useLanguage();
@@ -202,7 +203,7 @@ export function SignIn() {
   return (
     <SafeAreaView style={s.screen}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={s.screen}
       >
         <ScrollView
@@ -210,10 +211,20 @@ export function SignIn() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
         >
-          <Brand />
-          <Text accessibilityRole="header" style={s.title}>
-            {sent ? t("Enter your code") : t("Make yourself at home.")}
-          </Text>
+          <View style={[s.hero, sent && s.codeHero]}>
+            <View style={s.heroTop}>
+              <Brand />
+              {!sent && <PlannerDoodle width={84} height={70} />}
+            </View>
+            <Text accessibilityRole="header" style={s.title}>
+              {sent ? t("Enter your code") : t("Make yourself at home.")}
+            </Text>
+            {!sent && (
+              <Text style={s.heroCaption}>
+                {t("A little space for what matters.")}
+              </Text>
+            )}
+          </View>
           {sent ? (
             <View style={s.card}>
               <Text style={s.body}>{t("Sent to {v0}", { v0: email })}</Text>
@@ -256,7 +267,7 @@ export function SignIn() {
               </View>
               <Text style={s.caption}>{t("Expires in 5 minutes.")}</Text>
               {action(
-                "Sign in",
+                t("Sign in"),
                 async () => {
                   const result = await authClient.signIn.emailOtp({
                     email,
@@ -277,7 +288,7 @@ export function SignIn() {
                   "ghost",
                 )}
                 {action(
-                  "Change email",
+                  t("Change email"),
                   async () => {
                     setSent(false);
                     setOtp("");
@@ -326,9 +337,14 @@ export function SignIn() {
                 keyboardType="email-address"
                 autoComplete="email"
                 textContentType="emailAddress"
+                placeholder={t("Your email address")}
+                placeholderTextColor={colors.muted}
                 style={s.input}
               />
-              {action("Send me a code", () => send())}
+              {action(t("Send me a code"), () => send())}
+              <Text style={s.caption}>
+                {t("No password to remember. Just you and your plans.")}
+              </Text>
               {feedback}
               {providerState === "error" && (
                 <>
@@ -345,7 +361,9 @@ export function SignIn() {
               )}
             </View>
           )}
-          <LanguageChoice />
+          <View style={s.language}>
+            <LanguageChoice />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -373,7 +391,35 @@ const s = StyleSheet.create({
   },
   line: { flex: 1, height: 1, backgroundColor: surfaces.border },
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 20, gap: 16, paddingBottom: 24 },
+  content: {
+    padding: 20,
+    gap: 16,
+    paddingBottom: 32,
+    width: "100%",
+    maxWidth: 520,
+    alignSelf: "center",
+  },
+  hero: {
+    padding: 24,
+    paddingBottom: 32,
+    gap: 8,
+    borderRadius: 32,
+    backgroundColor: surfaces.blue,
+  },
+  heroTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  heroCaption: {
+    fontFamily: "NunitoSans",
+    fontSize: 16,
+    lineHeight: 23,
+    color: colors.text,
+  },
+  codeHero: { paddingBottom: 24 },
+  language: { paddingHorizontal: 8, marginTop: 8 },
   title: {
     fontFamily: "Baloo2",
     color: colors.text,
@@ -387,11 +433,14 @@ const s = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     gap: 12,
+    marginTop: -28,
+    borderWidth: 1,
+    borderColor: surfaces.border,
   },
   input: {
     minHeight: 48,
     borderWidth: 1,
-    borderColor: colors.muted,
+    borderColor: surfaces.inputBorder,
     borderRadius: 12,
     padding: 12,
     fontFamily: "NunitoSans",

@@ -1,9 +1,15 @@
 import Svg, { Path, Circle, Rect } from "react-native-svg";
 import { colors } from "@timely/design";
 /** Original small calendar doodle, decorative and bundled offline. */
-export function PlannerDoodle() {
+export function PlannerDoodle({
+  width = 120,
+  height = 100,
+}: {
+  width?: number;
+  height?: number;
+}) {
   return (
-    <Svg width={120} height={100} viewBox="0 0 120 100" accessible={false}>
+    <Svg width={width} height={height} viewBox="0 0 120 100" accessible={false}>
       <Circle cx="78" cy="40" r="34" fill={colors.lime} />
       <Rect
         x="19"

@@ -50,6 +50,131 @@ async function create(page: Page, title: string) {
     page.getByRole("heading", { name: title, exact: true }),
   ).toBeVisible();
 }
+test("friendly duration and weekdays survive reload, and month markers follow swipe navigation", async ({
+  page,
+  context,
+}) => {
+  await signIn(context, `editor-proof-${randomUUID()}@example.test`);
+  await page.goto("/?date=2026-10-09&mode=Day");
+  await expect(page.getByRole("status")).toContainText("Synced");
+  await page.getByRole("button", { name: "Add task", exact: true }).click();
+  await page.getByLabel("Task title").fill("A friendly weekday plan");
+  await page
+    .getByRole("button", { name: "Duration: 1 h", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Custom", exact: true }).click();
+  await page.getByLabel("Days", { exact: true }).selectOption("7");
+  await expect(page.locator(".duration-custom strong")).toHaveText("7 d");
+  await page.getByLabel("Days", { exact: true }).selectOption("1");
+  await page.getByLabel("Hours", { exact: true }).selectOption("1");
+  await page.getByLabel("Minutes", { exact: true }).selectOption("1");
+  await expect(page.locator(".duration-custom strong")).toHaveText(
+    "1 d 1 h 1 min",
+  );
+  await page
+    .getByRole("combobox", { name: "Frequency", exact: true })
+    .selectOption("weekdays");
+  await expect(
+    page.getByRole("combobox", { name: "Frequency", exact: true }),
+  ).toHaveValue("weekdays");
+  await page.getByLabel("Track a streak").check();
+  await expect(
+    page.getByText("Keep your fire going.", { exact: true }),
+  ).toBeVisible();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(
+    await page
+      .locator(".streak-flame")
+      .evaluate((element) => getComputedStyle(element).animationName),
+  ).toBe("none");
+  await page.getByRole("button", { name: "Save task", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "A friendly weekday plan", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("Synced");
+  await page.reload();
+  const card = page.locator("article.task-card").filter({
+    has: page.getByRole("heading", {
+      name: "A friendly weekday plan",
+      exact: true,
+    }),
+  });
+  await card
+    .getByRole("button", { name: "Edit A friendly weekday plan", exact: true })
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: "Frequency", exact: true }),
+  ).toHaveValue("weekdays");
+  await expect(page.getByLabel("Days", { exact: true })).toHaveValue("1");
+  await expect(page.getByLabel("Hours", { exact: true })).toHaveValue("1");
+  await expect(page.getByLabel("Minutes", { exact: true })).toHaveValue("1");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Month", exact: true }).click();
+  const grid = page.locator(".month-grid");
+  const friday = grid.getByRole("button", {
+    name: "9 October, 1 tasks",
+    exact: true,
+  });
+  await expect(friday.locator(".task-count")).toHaveText("1");
+  await expect(
+    grid
+      .getByRole("button", { name: "10 October, 0 tasks", exact: true })
+      .locator(".task-count"),
+  ).toHaveCount(0);
+  const swipeMonth = async (
+    from: [number, number],
+    through: [number, number],
+  ) => {
+    await grid.evaluate(
+      (element, { from, through }) => {
+        const touch = (point: [number, number]) =>
+          new Touch({
+            identifier: 1,
+            target: element,
+            clientX: point[0],
+            clientY: point[1],
+          });
+        element.dispatchEvent(
+          new TouchEvent("touchstart", {
+            bubbles: true,
+            touches: [touch(from)],
+          }),
+        );
+        element.dispatchEvent(
+          new TouchEvent("touchend", {
+            bubbles: true,
+            changedTouches: [touch(through)],
+          }),
+        );
+      },
+      { from, through },
+    );
+  };
+  await swipeMonth([230, 300], [100, 305]);
+  await expect(
+    page.getByRole("heading", { name: "November 2026", exact: true }),
+  ).toBeVisible();
+  await swipeMonth([100, 300], [230, 305]);
+  await expect(
+    page.getByRole("heading", { name: "October 2026", exact: true }),
+  ).toBeVisible();
+  await swipeMonth([100, 300], [110, 450]);
+  await expect(
+    page.getByRole("heading", { name: "October 2026", exact: true }),
+  ).toBeVisible();
+  await grid
+    .getByRole("button", { name: "12 October, 1 tasks", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "A friendly weekday plan", exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
 test("streak opt-in, offline completion, ended deadlines and another device agree", async ({
   page,
   context,
@@ -68,14 +193,12 @@ test("streak opt-in, offline completion, ended deadlines and another device agre
     .selectOption("daily");
   await page.getByLabel("Track a streak").check();
   await page.getByRole("button", { name: "Save task", exact: true }).click();
-  const card = page
-    .locator("article.task-card")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "Read a little each day",
-        exact: true,
-      }),
-    });
+  const card = page.locator("article.task-card").filter({
+    has: page.getByRole("heading", {
+      name: "Read a little each day",
+      exact: true,
+    }),
+  });
   await expect(
     card.getByText("Start your streak", { exact: true }),
   ).toBeVisible();
@@ -126,14 +249,12 @@ test("streak opt-in, offline completion, ended deadlines and another device agre
     .selectOption("daily");
   await page.getByLabel("Track a streak").check();
   await page.getByRole("button", { name: "Save task", exact: true }).click();
-  const missed = page
-    .locator("article.task-card")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "A missed reading deadline",
-        exact: true,
-      }),
-    });
+  const missed = page.locator("article.task-card").filter({
+    has: page.getByRole("heading", {
+      name: "A missed reading deadline",
+      exact: true,
+    }),
+  });
   await expect(missed.getByText("Streak ended", { exact: true })).toBeVisible();
   await expect(
     missed.getByRole("button", { name: "Skip", exact: true }),

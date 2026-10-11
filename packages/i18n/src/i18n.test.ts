@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import ts from "typescript";
 import {
   defaultLanguage,
+  durationText,
   errorMessage,
   getLanguage,
   locale,
@@ -89,6 +90,17 @@ it("covers literal UI messages and prevents English-only accessible labels from 
             failures.push(`${file}: missing ${key}`);
         }
         if (
+          ts.isCallExpression(node) &&
+          ts.isIdentifier(node.expression) &&
+          node.expression.text === "action" &&
+          node.arguments[0] &&
+          ts.isStringLiteral(node.arguments[0]) &&
+          file === "apps/mobile/src/sign-in.tsx"
+        )
+          failures.push(
+            `${file}: untranslated sign-in action ${node.arguments[0].text}`,
+          );
+        if (
           ts.isJsxText(node) &&
           /[A-Za-z]{2}/.test(node.text) &&
           !["timely", "English", "Español"].includes(node.text.trim())
@@ -110,6 +122,16 @@ it("covers literal UI messages and prevents English-only accessible labels from 
   }
   directories.forEach(scan);
   expect(failures).toEqual([]);
+});
+it("formats optional duration as effort in days, hours and minutes in both languages", () => {
+  expect(durationText(null)).toBe("Sin duración");
+  expect(durationText(15)).toBe("15 min");
+  expect(durationText(60)).toBe("1 h");
+  expect(durationText(1501)).toBe("1 d 1 h 1 min");
+  expect(durationText(10080)).toBe("7 d");
+  setLanguage("en");
+  expect(durationText(null)).toBe("No duration");
+  expect(durationText(90)).toBe("1 h 30 min");
 });
 it("formats daily, weekly, ordinal monthly and yearly rules without changing schedules", () => {
   const common = {

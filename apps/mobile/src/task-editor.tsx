@@ -10,9 +10,16 @@ import {
   type Selector,
   type Occurrence,
 } from "@timely/contracts";
-import { preview, recurrencePreset, type Scope } from "@timely/domain";
+import {
+  preview,
+  recurrencePreset,
+  selectedRecurrencePreset,
+  type Scope,
+} from "@timely/domain";
 import { Button, Choices, Field, Sheet, s } from "./ui";
 import { DateField } from "./date-field";
+import { DurationField } from "./duration-field";
+import { StreakSetting } from "./streak-setting";
 const weekdays = [
   "Monday",
   "Tuesday",
@@ -199,28 +206,12 @@ export function TaskEditor({
               patch({ schedule: { ...task.schedule, time: null } })
             }
           />
-          <Field
-            label={t("Duration in minutes (optional)")}
-            value={
-              task.schedule.duration === null
-                ? ""
-                : String(task.schedule.duration)
-            }
-            keyboardType="number-pad"
-            onChangeText={(value) =>
-              patch({
-                schedule: {
-                  ...task.schedule,
-                  duration: value === "" ? null : Number(value),
-                },
-              })
+          <DurationField
+            value={task.schedule.duration}
+            onChange={(duration) =>
+              patch({ schedule: { ...task.schedule, duration } })
             }
           />
-          <Text style={s.muted}>
-            {t(
-              "1\u201310,080 minutes. Time and duration can be cleared separately.",
-            )}
-          </Text>
           <Choices
             label={t("Priority")}
             value={task.priority ?? "none"}
@@ -243,7 +234,7 @@ export function TaskEditor({
           />
           <Choices
             label={t("Repeat preset")}
-            value={task.rule?.frequency ?? "none"}
+            value={selectedRecurrencePreset(task.rule)}
             options={[
               { value: "none", label: t("Does not repeat") },
               { value: "daily", label: t("Every day") },
@@ -262,6 +253,18 @@ export function TaskEditor({
               })
             }
           />
+          {task.rule && (
+            <StreakSetting
+              enabled={!!task.streak}
+              onChange={(enabled) =>
+                patch({
+                  streak: enabled
+                    ? { from: item ? currentDay : task.rule!.anchor }
+                    : null,
+                })
+              }
+            />
+          )}
           {task.rule && (
             <View style={s.card}>
               <Text style={s.section}>{t("Customize recurrence")}</Text>
@@ -501,34 +504,6 @@ export function TaskEditor({
                     ? dates.map((d) => d.date).join(" · ")
                     : t("No dates within 1900\u20132100."),
                 })}
-              </Text>
-            </View>
-          )}
-          {task.rule && (
-            <View style={s.card}>
-              <View style={s.row}>
-                <Text style={[s.label, s.grow]}>{t("Track a streak")}</Text>
-                <Switch
-                  accessibilityLabel={t("Track a streak")}
-                  value={!!task.streak}
-                  onValueChange={(enabled) =>
-                    patch({
-                      streak: enabled
-                        ? { from: item ? currentDay : task.rule!.anchor }
-                        : null,
-                    })
-                  }
-                />
-              </View>
-              <Text style={s.body}>
-                {t(
-                  "Complete each occurrence before its deadline to keep your streak. Skipping is unavailable.",
-                )}
-              </Text>
-              <Text style={s.muted}>
-                {t(
-                  "Untimed tasks are due at the end of the day; timed tasks are due at their time plus duration.",
-                )}
               </Text>
             </View>
           )}

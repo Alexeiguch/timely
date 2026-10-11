@@ -28,7 +28,6 @@ import { civilDate, type Occurrence } from "@timely/contracts";
 import {
   addDays,
   adjacentPeriod,
-  calendarDays,
   formatCivilDate,
   clampDay,
   compareOccurrences,
@@ -48,6 +47,7 @@ import { StreakIndicator } from "./streak-indicator";
 import { TaskCard } from "./task-card";
 import { DateField } from "./date-field";
 import { PlannerDoodle } from "./doodle";
+import { MonthCalendar } from "./month-calendar";
 import { Button, Choices, Segmented, IconButton, Sheet, s } from "./ui";
 type Row =
   | {
@@ -465,70 +465,17 @@ export function NativePlanner() {
             )}
             {p.mode === "Month" && (
               <>
-                <ScrollView horizontal>
-                  <View style={styles.calendar}>
-                    <View style={styles.calendarGrid}>
-                      {Array.from(
-                        { length: 7 },
-                        (_, i) =>
-                          ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][
-                            (p.preferences.firstWeekday - 1 + i) % 7
-                          ],
-                      ).map((d, i) => (
-                        <Text key={i} style={[s.muted, styles.weekday]}>
-                          {t(d!).slice(0, 1)}
-                        </Text>
-                      ))}
-                      {calendarDays(p.selected, p.preferences.firstWeekday).map(
-                        (day, i) =>
-                          day ? (
-                            <Pressable
-                              key={day}
-                              accessibilityRole="button"
-                              accessibilityState={{
-                                selected: day === p.selected,
-                              }}
-                              accessibilityLabel={t("{v0}, {v1} tasks", {
-                                v0: day,
-                                v1: all.filter(
-                                  (item) => item.schedule.date === day,
-                                ).length,
-                              })}
-                              style={[
-                                styles.day,
-                                day === p.selected && styles.selectedDay,
-                              ]}
-                              onPress={() => {
-                                p.setSelected(day);
-                                p.setMode("Day");
-                              }}
-                            >
-                              <Text
-                                style={[
-                                  s.body,
-                                  day === p.selected && s.activeText,
-                                ]}
-                              >
-                                {date(day).day}
-                              </Text>
-                              <Text
-                                style={[
-                                  styles.dot,
-                                  day === p.selected && s.activeText,
-                                ]}
-                              >
-                                {all.some((item) => item.schedule.date === day)
-                                  ? "•"
-                                  : " "}
-                              </Text>
-                            </Pressable>
-                          ) : (
-                            <View key={`blank-${i}`} style={styles.day} />
-                          ),
-                      )}
-                    </View>
-                  </View>
-                </ScrollView>
+                <MonthCalendar
+                  selected={p.selected}
+                  today={p.currentDay}
+                  firstWeekday={p.preferences.firstWeekday}
+                  items={all}
+                  onNavigate={navigate}
+                  onSelect={(day) => {
+                    p.setSelected(day);
+                    p.setMode("Day");
+                  }}
+                />
                 <Choices
                   label={t("Month details")}
                   value={p.grouped ? "grouped" : "all"}
@@ -724,16 +671,4 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   separator: { height: 12 },
-  calendar: { width: 308, paddingVertical: 8 },
-  calendarGrid: { flexDirection: "row", flexWrap: "wrap" },
-  weekday: { width: 44, textAlign: "center", paddingVertical: 8 },
-  day: {
-    width: 44,
-    minHeight: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 12,
-  },
-  selectedDay: { backgroundColor: colors.primary },
-  dot: { color: colors.primary, fontSize: 12, lineHeight: 12 },
 });

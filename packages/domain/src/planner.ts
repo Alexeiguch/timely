@@ -102,3 +102,18 @@ export function recurrencePreset(
     ? { ...common, frequency: "monthly", selector }
     : { ...common, frequency: "yearly", month: value.month, selector };
 }
+
+/** Weekdays is a weekly rule, but remains a distinct choice in both editors. */
+export function selectedRecurrencePreset(
+  rule: Rule | null,
+): Parameters<typeof recurrencePreset>[0] {
+  if (!rule) return "none";
+  if (
+    rule.frequency === "weekly" &&
+    rule.interval === 1 &&
+    rule.weekdays.length === 5 &&
+    [1, 2, 3, 4, 5].every((day) => rule.weekdays.includes(day))
+  )
+    return "weekdays";
+  return rule.frequency;
+}

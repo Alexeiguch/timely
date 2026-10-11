@@ -9,7 +9,14 @@ import {
   type Rule,
   type Occurrence,
 } from "@timely/contracts";
-import { date, preview, recurrencePreset } from "@timely/domain";
+import {
+  date,
+  preview,
+  recurrencePreset,
+  selectedRecurrencePreset,
+} from "@timely/domain";
+import { DurationField } from "./duration-field";
+import { StreakSetting } from "./streak-setting";
 type Props = {
   initial: Task;
   currentDay: string;
@@ -144,23 +151,6 @@ export function TaskEditor({
             />
           </label>
           <label>
-            {t("Duration in minutes")}
-            <input
-              type="number"
-              min="1"
-              max="10080"
-              value={task.schedule.duration ?? ""}
-              onChange={(e) =>
-                patch({
-                  schedule: {
-                    ...task.schedule,
-                    duration: e.target.value ? Number(e.target.value) : null,
-                  },
-                })
-              }
-            />
-          </label>
-          <label>
             {t("Priority")}
             <select
               value={task.priority ?? ""}
@@ -177,6 +167,12 @@ export function TaskEditor({
             </select>
           </label>
         </div>
+        <DurationField
+          value={task.schedule.duration}
+          onChange={(duration) =>
+            patch({ schedule: { ...task.schedule, duration } })
+          }
+        />
         <label>
           {t("Notes")}
           <textarea
@@ -204,16 +200,29 @@ export function TaskEditor({
           <label>
             {t("Frequency")}
             <select
-              value={task.rule?.frequency ?? "none"}
+              value={selectedRecurrencePreset(task.rule)}
               onChange={(e) => frequency(e.target.value)}
             >
               <option value="none">{t("Does not repeat")}</option>
               <option value="daily">{t("Daily")}</option>
+              <option value="weekdays">{t("Weekdays")}</option>
               <option value="weekly">{t("Weekly")}</option>
               <option value="monthly">{t("Monthly")}</option>
               <option value="yearly">{t("Yearly")}</option>
             </select>
           </label>
+          {task.rule && (
+            <StreakSetting
+              enabled={!!task.streak}
+              onChange={(enabled) =>
+                patch({
+                  streak: enabled
+                    ? { from: occurrence ? currentDay : task.rule!.anchor }
+                    : null,
+                })
+              }
+            />
+          )}
           {task.rule && (
             <>
               <div className="form-grid">
@@ -481,35 +490,10 @@ export function TaskEditor({
             </>
           )}
         </fieldset>
-        {task.rule && (
-          <fieldset disabled={!ruleEditable} className="streak-setting">
-            <label className="row">
-              <input
-                type="checkbox"
-                checked={!!task.streak}
-                onChange={(event) =>
-                  patch({
-                    streak: event.target.checked
-                      ? { from: occurrence ? currentDay : task.rule!.anchor }
-                      : null,
-                  })
-                }
-              />
-              {t("Track a streak")}
-            </label>
-            <p className="muted">
-              {t(
-                "Complete each occurrence before its deadline to keep your streak. Skipping is unavailable. Untimed tasks are due at the end of the day; timed tasks are due at their time plus duration.",
-              )}
-            </p>
-            {!!occurrence && !ruleEditable && (
-              <p className="muted">
-                {t(
-                  "Choose a future or series scope to change streak tracking.",
-                )}
-              </p>
-            )}
-          </fieldset>
+        {!!task.rule && !!occurrence && !ruleEditable && (
+          <p className="muted">
+            {t("Choose a future or series scope to change streak tracking.")}
+          </p>
         )}
         <p className="muted">
           {t(
