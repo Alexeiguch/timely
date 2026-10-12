@@ -6,7 +6,6 @@ import { colors, surfaces } from "@timely/design";
 import type { Occurrence } from "@timely/contracts";
 import {
   boundaries,
-  date,
   streakKey,
   formatCivilDate,
   streakOutcome,

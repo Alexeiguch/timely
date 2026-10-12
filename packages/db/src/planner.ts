@@ -1,4 +1,6 @@
-import { createHash, randomUUID } from "node:crypto";
+import { OperationFingerprint } from "./operation-fingerprint";
+import { lockOwner } from "./owner-lock";
+import { randomUUID } from "node:crypto";
 import { and, asc, eq, gt, lt, sql } from "drizzle-orm";
 import {
   bootstrapSchema,
@@ -23,33 +25,6 @@ import {
 import { database } from "./index";
 import * as t from "./planner-schema";
 type DB = ReturnType<typeof database>;
-type Tx = Parameters<Parameters<DB["transaction"]>[0]>[0];
-const owned = (column: typeof t.taskDefinitions.ownerId, ownerId: string) =>
-  eq(column, ownerId);
-function fingerprint(value: unknown): string {
-  const stable = (v: unknown): unknown =>
-    Array.isArray(v)
-      ? v.map(stable)
-      : v && typeof v === "object"
-        ? Object.fromEntries(
-            Object.entries(v)
-              .sort(([a], [b]) => a.localeCompare(b))
-              .map(([k, x]) => [k, stable(x)]),
-          )
-        : v;
-  return createHash("sha256")
-    .update(JSON.stringify(stable(value)))
-    .digest("hex");
-}
-async function lockHead(tx: Tx, ownerId: string) {
-  await tx.insert(t.syncHeads).values({ ownerId }).onConflictDoNothing();
-  const [head] = await tx
-    .select()
-    .from(t.syncHeads)
-    .where(eq(t.syncHeads.ownerId, ownerId))
-    .for("update");
-  return head!.cursor;
-}
 export function planner(db: DB = database()) {
   return {
     async register(ownerId: string, input: unknown) {
@@ -70,7 +45,7 @@ export function planner(db: DB = database()) {
     async push(ownerId: string, input: unknown) {
       const batch = pushSchema.parse(input);
       return db.transaction(async (tx) => {
-        let cursor = await lockHead(tx, ownerId);
+        let cursor = await lockOwner(tx, ownerId);
         const [device] = await tx
           .select()
           .from(t.syncDevices)
@@ -98,7 +73,7 @@ export function planner(db: DB = database()) {
           );
         const results: Outcome[] = [];
         for (const authored of batch.operations) {
-          const digest = fingerprint(authored);
+          const digest = OperationFingerprint.of(authored);
           const [prior] = await tx
             .select()
             .from(t.syncOperations)
@@ -328,7 +303,7 @@ export function planner(db: DB = database()) {
             "Start a snapshot at position zero.",
           );
         await db.transaction(async (tx) => {
-          const watermark = await lockHead(tx, ownerId);
+          const watermark = await lockOwner(tx, ownerId);
           const expired = await tx
             .select()
             .from(t.syncSnapshots)
@@ -408,7 +383,7 @@ export function planner(db: DB = database()) {
         await db
           .select()
           .from(t.taskDefinitions)
-          .where(owned(t.taskDefinitions.ownerId, ownerId))
+          .where(eq(t.taskDefinitions.ownerId, ownerId))
       ).map((row) => recordSchema.parse(row.record));
     },
   };

@@ -1,4 +1,4 @@
-import { t, locale } from "@timely/i18n";
+import { t } from "@timely/i18n";
 import { useLanguage } from "./language-state";
 import type { ReactNode } from "react";
 import {

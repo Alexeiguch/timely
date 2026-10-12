@@ -5,7 +5,8 @@ import {
   type Rule,
   type Task,
 } from "@timely/contracts";
-import { addDays, date } from "./time";
+import { projectSeries, type Series } from "./series";
+import { addDays, date, status, today } from "./time";
 export type PlannerMode = "Day" | "Week" | "Month";
 export const calendarBounds = { from: "1900-01-01", through: "2100-12-31" };
 export function clampDay(day: string) {
@@ -65,6 +66,27 @@ export function compareOccurrences(a: Occurrence, b: Occurrence) {
     a.order.localeCompare(b.order) ||
     a.id.localeCompare(b.id)
   );
+}
+/** Catch-up references belong above today's Day view; cards retain their identity. */
+export function overdueOccurrences(
+  series: Series[],
+  selected: string,
+  mode: PlannerMode,
+  zone: string,
+  now: number,
+) {
+  const currentDay = today(zone, now);
+  if (mode !== "Day" || selected !== currentDay) return [];
+  return series
+    .flatMap((record) =>
+      projectSeries(record, clampDay(addDays(currentDay, -365)), currentDay),
+    )
+    .filter(
+      (item) =>
+        item.schedule.date < currentDay &&
+        status(item, zone, now) === "overdue",
+    )
+    .sort(compareOccurrences);
 }
 export function newTask(id: string, day: string): Task {
   return {

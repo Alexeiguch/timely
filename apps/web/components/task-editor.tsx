@@ -1,5 +1,5 @@
 "use client";
-import { t, locale, errorMessage, recurrenceText } from "@timely/i18n";
+import { t, errorMessage, recurrenceText } from "@timely/i18n";
 import { useLanguage } from "./language-state";
 
 import { useEffect, useRef, useState } from "react";

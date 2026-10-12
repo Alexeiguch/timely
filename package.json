@@ -11,7 +11,7 @@
     "build": "pnpm --filter @timely/web build",
     "typecheck": "turbo typecheck",
     "test": "vitest run",
-    "lint": "node scripts/check-boundaries.mjs",
+    "lint": "eslint . && node scripts/check-boundaries.mjs",
     "db:generate": "pnpm --filter @timely/db generate",
     "db:migrate": "pnpm --filter @timely/db migrate",
     "test:e2e": "playwright test",
@@ -20,14 +20,18 @@
     "fix:expo-vscode-debugger": "node scripts/patch-expo-vscode-debugger.mjs"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@playwright/test": "1.58.2",
     "@types/node": "24.10.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
     "auth": "1.7.6",
+    "eslint": "10.12.0",
+    "eslint-plugin-react-hooks": "7.1.1",
     "tsx": "4.21.0",
     "turbo": "2.11.5",
     "typescript": "6.0.3",
+    "typescript-eslint": "8.71.1",
     "vitest": "4.1.11"
   },
   "dependencies": {

@@ -1,4 +1,6 @@
-import { createHash, randomUUID } from "node:crypto";
+import { NotificationRecords } from "./notification-records";
+import { lockOwner } from "./owner-lock";
+import { randomUUID } from "node:crypto";
 import {
   and,
   asc,
@@ -9,24 +11,18 @@ import {
   isNull,
   lte,
   or,
+  sql,
 } from "drizzle-orm";
 import {
   notificationRegistrationSchema,
   notificationCoverageSchema,
-  recordSchema,
-  preferenceRecordSchema,
   type NotificationCoverage,
   type NotificationRegistration,
 } from "@timely/contracts";
-import {
-  CommandError,
-  reducePreferences,
-  remoteReminderCandidates,
-} from "@timely/sync";
+import { CommandError, remoteReminderCandidates } from "@timely/sync";
 import { database } from "./index";
 import * as t from "./planner-schema";
 type DB = ReturnType<typeof database>;
-type Tx = Parameters<Parameters<DB["transaction"]>[0]>[0];
 export type NotificationJob = typeof t.notificationJobs.$inferSelect;
 const committed = [
   "dispatching",
@@ -35,101 +31,8 @@ const committed = [
   "uncertain",
   "handled",
 ];
-const reversible = ["pending", "local"];
-export function pushTokenHash(token: string) {
-  return createHash("sha256").update(token).digest("hex");
-}
-async function lockOwner(tx: Tx, ownerId: string) {
-  await tx.insert(t.syncHeads).values({ ownerId }).onConflictDoNothing();
-  const [head] = await tx
-    .select()
-    .from(t.syncHeads)
-    .where(eq(t.syncHeads.ownerId, ownerId))
-    .for("update");
-  return head!.cursor;
-}
-async function snapshot(tx: Tx, ownerId: string) {
-  const records = (
-    await tx
-      .select({ record: t.taskDefinitions.record })
-      .from(t.taskDefinitions)
-      .where(eq(t.taskDefinitions.ownerId, ownerId))
-  ).map((row) => recordSchema.parse(row.record));
-  const [preferences] = await tx
-    .select()
-    .from(t.userPreferences)
-    .where(eq(t.userPreferences.ownerId, ownerId));
-  return {
-    records,
-    preferences: reducePreferences(
-      preferences
-        ? preferenceRecordSchema.parse(preferences.record)
-        : undefined,
-    ),
-  };
-}
-async function ownedDevice(tx: Tx, ownerId: string, deviceId: string) {
-  const [device] = await tx
-    .select()
-    .from(t.syncDevices)
-    .where(
-      and(eq(t.syncDevices.ownerId, ownerId), eq(t.syncDevices.id, deviceId)),
-    );
-  if (!device || device.platform === "web")
-    throw new CommandError(
-      "FORBIDDEN",
-      "Register this mobile device before enabling push.",
-    );
-  return device;
-}
-function jobValues(
-  ownerId: string,
-  deviceId: string,
-  entry: ReturnType<typeof remoteReminderCandidates>[number],
-) {
-  return {
-    ownerId,
-    deviceId,
-    key: entry.key,
-    occurrenceId: entry.item.id,
-    definitionId: entry.item.definitionId,
-    version: entry.plan.version,
-    kind: entry.plan.kind,
-    day: entry.item.schedule.date,
-    due: entry.plan.due,
-    expires: entry.expires,
-  };
-}
-async function insertJobs(
-  tx: Tx,
-  jobs: (typeof t.notificationJobs.$inferInsert)[],
-) {
-  for (let start = 0; start < jobs.length; start += 500)
-    await tx
-      .insert(t.notificationJobs)
-      .values(jobs.slice(start, start + 500))
-      .onConflictDoNothing();
-}
-async function updateJobStatuses(
-  tx: Tx,
-  ownerId: string,
-  deviceId: string,
-  statuses: Map<string, string[]>,
-) {
-  for (const [status, keys] of statuses)
-    for (let start = 0; start < keys.length; start += 500)
-      await tx
-        .update(t.notificationJobs)
-        .set({ status })
-        .where(
-          and(
-            eq(t.notificationJobs.ownerId, ownerId),
-            eq(t.notificationJobs.deviceId, deviceId),
-            inArray(t.notificationJobs.key, keys.slice(start, start + 500)),
-            inArray(t.notificationJobs.status, reversible),
-          ),
-        );
-}
+const reversible = NotificationRecords.reversible;
+export const pushTokenHash = NotificationRecords.tokenHash;
 export function notificationRepository(db: DB = database()) {
   return {
     /** Pause remote dispatch before touching the OS. A crash leaves local ownership protected until reconciliation. */
@@ -148,7 +51,11 @@ export function notificationRepository(db: DB = database()) {
         );
       return db.transaction(async (tx) => {
         await lockOwner(tx, ownerId);
-        const device = await ownedDevice(tx, ownerId, value.deviceId);
+        const device = await NotificationRecords.ownedDevice(
+          tx,
+          ownerId,
+          value.deviceId,
+        );
         if (device.platform !== value.platform)
           throw new CommandError(
             "FORBIDDEN",
@@ -242,7 +149,11 @@ export function notificationRepository(db: DB = database()) {
         notificationCoverageSchema.parse(input);
       return db.transaction(async (tx) => {
         const cursor = await lockOwner(tx, ownerId);
-        const device = await ownedDevice(tx, ownerId, value.deviceId);
+        const device = await NotificationRecords.ownedDevice(
+          tx,
+          ownerId,
+          value.deviceId,
+        );
         const [push] = await tx
           .select()
           .from(t.notificationDevices)
@@ -270,7 +181,7 @@ export function notificationRepository(db: DB = database()) {
             );
         await pause();
         if (cursor !== value.cursor) return { ready: false, retry: true };
-        const state = await snapshot(tx, ownerId);
+        const state = await NotificationRecords.snapshot(tx, ownerId);
         const candidates = remoteReminderCandidates(
           state.records,
           state.preferences,
@@ -314,7 +225,7 @@ export function notificationRepository(db: DB = database()) {
           if (prior && committed.includes(prior.status))
             return { ready: false, retry: true };
         }
-        await insertJobs(
+        await NotificationRecords.insertJobs(
           tx,
           candidates
             .filter(
@@ -327,7 +238,7 @@ export function notificationRepository(db: DB = database()) {
                 ),
             )
             .map((entry) => ({
-              ...jobValues(ownerId, value.deviceId, entry),
+              ...NotificationRecords.jobValues(ownerId, value.deviceId, entry),
               status:
                 handled.has(entry.key) && entry.plan.due <= now
                   ? "handled"
@@ -356,7 +267,12 @@ export function notificationRepository(db: DB = database()) {
             statuses.set(status, keys);
           }
         }
-        await updateJobStatuses(tx, ownerId, value.deviceId, statuses);
+        await NotificationRecords.updateJobStatuses(
+          tx,
+          ownerId,
+          value.deviceId,
+          statuses,
+        );
         const ready = push.permission === "granted" && !!push.token;
         await tx
           .update(t.notificationDevices)
@@ -392,7 +308,7 @@ export function notificationRepository(db: DB = database()) {
     async test(ownerId: string, deviceId: string, now = Date.now()) {
       return db.transaction(async (tx) => {
         await lockOwner(tx, ownerId);
-        await ownedDevice(tx, ownerId, deviceId);
+        await NotificationRecords.ownedDevice(tx, ownerId, deviceId);
         const [push] = await tx
           .select()
           .from(t.notificationDevices)
@@ -435,34 +351,81 @@ export function notificationRepository(db: DB = database()) {
       });
     },
     async owners(now = Date.now()) {
-      const rows = await db
-        .select({ ownerId: t.jobOutbox.ownerId })
-        .from(t.jobOutbox)
-        .where(isNull(t.jobOutbox.processedAt))
-        .groupBy(t.jobOutbox.ownerId)
-        .limit(50);
-      const rolling = await db
-        .select({ ownerId: t.notificationDevices.ownerId })
-        .from(t.notificationDevices)
-        .where(
-          and(
-            eq(t.notificationDevices.permission, "granted"),
-            lte(t.notificationDevices.plannedThrough, now + 6 * 86400000),
-          ),
-        )
-        .limit(50);
-      return [...new Set([...rows, ...rolling].map((row) => row.ownerId))];
+      // One owner per slot across both sources, least recently attempted first.
+      // The conditional upsert leases the batch across overlapping workers.
+      return db.transaction(async (tx) => {
+        const candidates = await tx.execute<{ owner_id: string }>(sql`
+          select candidates.owner_id
+          from (
+            select owner_id, min(due) as due from (
+              select owner_id, extract(epoch from created_at) * 1000 as due
+              from ${t.jobOutbox}
+              where processed_at is null and type in ('reconcile-definition', 'reconcile-preferences')
+              union all
+              select owner_id, planned_through as due from ${t.notificationDevices}
+              where permission = 'granted' and planned_through <= ${now + 6 * 86400000}
+            ) sources group by owner_id
+          ) candidates
+          left join ${t.notificationReconciliations} work on work.owner_id = candidates.owner_id
+          where coalesce(work.next_attempt, 0) <= ${now}
+          order by coalesce(work.last_attempt, 0), candidates.due, candidates.owner_id
+          limit 50
+        `);
+        if (!candidates.length) return [];
+        const claimed = await tx
+          .insert(t.notificationReconciliations)
+          .values(
+            candidates.map(({ owner_id }) => ({
+              ownerId: owner_id,
+              lastAttempt: now,
+              nextAttempt: now + 60000,
+            })),
+          )
+          .onConflictDoUpdate({
+            target: t.notificationReconciliations.ownerId,
+            set: { lastAttempt: now, nextAttempt: now + 60000 },
+            setWhere: lte(t.notificationReconciliations.nextAttempt, now),
+          })
+          .returning({ ownerId: t.notificationReconciliations.ownerId });
+        const selected = new Set(claimed.map((row) => row.ownerId));
+        return candidates
+          .filter((row) => selected.has(row.owner_id))
+          .map((row) => row.owner_id);
+      });
+    },
+    async reconciliationFailed(ownerId: string, now = Date.now()) {
+      // Keep failed work discoverable, with bounded exponential backoff.
+      await db
+        .insert(t.notificationReconciliations)
+        .values({
+          ownerId,
+          lastAttempt: now,
+          nextAttempt: now + 60000,
+          attempts: 1,
+        })
+        .onConflictDoUpdate({
+          target: t.notificationReconciliations.ownerId,
+          set: {
+            attempts: sql`${t.notificationReconciliations.attempts} + 1`,
+            nextAttempt: sql`${now} + least(3600000, 60000 * power(2, least(${t.notificationReconciliations.attempts}, 6)))`,
+          },
+          setWhere: eq(t.notificationReconciliations.lastAttempt, now),
+        });
     },
     async reconcile(ownerId: string, now = Date.now()) {
       await db.transaction(async (tx) => {
         await lockOwner(tx, ownerId);
-        const state = await snapshot(tx, ownerId);
+        const state = await NotificationRecords.snapshot(tx, ownerId);
         const devices = await tx
           .select()
           .from(t.notificationDevices)
           .where(eq(t.notificationDevices.ownerId, ownerId));
         for (const push of devices) {
-          const device = await ownedDevice(tx, ownerId, push.deviceId);
+          const device = await NotificationRecords.ownedDevice(
+            tx,
+            ownerId,
+            push.deviceId,
+          );
           const candidates =
             push.permission === "granted" && push.token
               ? remoteReminderCandidates(
@@ -490,7 +453,7 @@ export function notificationRepository(db: DB = database()) {
               ),
             );
           const priorKeys = new Set(existing.map((job) => job.key));
-          await insertJobs(
+          await NotificationRecords.insertJobs(
             tx,
             candidates
               .filter(
@@ -498,7 +461,9 @@ export function notificationRepository(db: DB = database()) {
                   !priorKeys.has(entry.key) &&
                   !(entry.plan.kind === "before" && entry.plan.due <= now),
               )
-              .map((entry) => jobValues(ownerId, device.id, entry)),
+              .map((entry) =>
+                NotificationRecords.jobValues(ownerId, device.id, entry),
+              ),
           );
           const cancelled = existing
             .filter(
@@ -508,7 +473,7 @@ export function notificationRepository(db: DB = database()) {
                 !desired.has(job.key),
             )
             .map((job) => job.key);
-          await updateJobStatuses(
+          await NotificationRecords.updateJobStatuses(
             tx,
             ownerId,
             device.id,
@@ -524,6 +489,15 @@ export function notificationRepository(db: DB = database()) {
               ),
             );
         }
+        await tx
+          .update(t.notificationReconciliations)
+          .set({ attempts: 0, nextAttempt: 0 })
+          .where(
+            and(
+              eq(t.notificationReconciliations.ownerId, ownerId),
+              lte(t.notificationReconciliations.lastAttempt, now),
+            ),
+          );
         await tx
           .update(t.jobOutbox)
           .set({ processedAt: new Date(now) })
@@ -611,8 +585,12 @@ export function notificationRepository(db: DB = database()) {
           push.permission !== "granted"
         )
           return null;
-        const device = await ownedDevice(tx, job.ownerId, job.deviceId);
-        const state = await snapshot(tx, job.ownerId);
+        const device = await NotificationRecords.ownedDevice(
+          tx,
+          job.ownerId,
+          job.deviceId,
+        );
+        const state = await NotificationRecords.snapshot(tx, job.ownerId);
         const canonical =
           current.kind === "test"
             ? null

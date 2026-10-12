@@ -1,6 +1,6 @@
-import { t, locale, errorMessage } from "@timely/i18n";
+import { t, errorMessage } from "@timely/i18n";
 import { useLanguage } from "./language-state";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { CloudCheck, RefreshCw, CloudOff } from "lucide-react-native";
 import { colors } from "@timely/design";
 import { router } from "expo-router";

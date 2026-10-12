@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import type { Metadata } from "next";
 import "@fontsource/baloo-2/700.css";
 import "@fontsource/baloo-2/800.css";
@@ -10,11 +11,12 @@ export const metadata: Metadata = {
   title: "Timely — Un pequeño espacio para tu día",
   description: "Tu agenda personal, a tu ritmo.",
 };
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  await connection();
   return (
     <html lang="es">
       <body>

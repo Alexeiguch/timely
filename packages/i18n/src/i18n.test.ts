@@ -13,7 +13,6 @@ import {
   recurrenceText,
   setLanguage,
   streakText,
-  t,
   translate,
   watchLanguageStorage,
 } from "./index";

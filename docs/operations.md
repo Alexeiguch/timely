@@ -1,6 +1,6 @@
 # Planner operations and recovery
 
-This is preparation for an undeployed planner. No hosted reminder worker is active. [Release readiness](release-readiness.md) lists actual evidence and unverified gates.
+Operational guidance for the web/native planner. [Release readiness](release-readiness.md) lists actual hosted and native evidence and unverified gates; hosted reminder worker acceptance remains open.
 
 ## Signals and privacy
 
@@ -29,3 +29,9 @@ Before a production migration, create an approved Neon branch/restore point and 
 Do not prune operation dedupe records, canonical journals, tombstones, feed rows or unprocessed jobs until the checkpoint/retained-cursor policy is implemented and tested. Fixed snapshots are temporary; their cleanup and storage monitoring must be validated before large-scale deployment. Document the oldest supported offline client and prove that rebootstrap preserves queued work before enabling any retention.
 
 For app rollback, preserve forward-compatible local schema readers and backend command support. Test the old artifact against the migrated branch and retained local outbox before rollout. If incompatible, stop the rollout and prepare a corrective forward release; do not restore production blindly over newer user writes.
+
+## Review reliability changes — 2026-10-12
+
+API `api_failure` logs correlate with the response's `X-Request-ID` / `requestId`. Inspect allowlisted error type/code and code locations without requesting task payloads or credentials. `500 / INTERNAL_ERROR` indicates an unexpected internal failure; recognized availability errors use 503. Clients report HTTP failures as Needs attention and retain local changes for retry. See [ADR 017](decisions/017-review-reliability.md).
+
+Reminder runs return `failedOwners` and `failedJobs` alongside successful reconciliation/send/receipt counts. Inspect `push_reconciliation_failure`, `push_dispatch_failure`, `push_receipt_failure`, and infrastructure `push_worker_failure` events using their run ID. Failed owners remain queued with durable bounded backoff; restart does not clear it. Do not clear delivery state or replay uncertain sends to recover a single account. The one-minute reconciliation lease recovers interrupted runs automatically. Apply migration `0005_aberrant_masque` before rolling out this worker.

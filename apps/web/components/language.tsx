@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, type ReactNode } from "react";
-import { languageStorageKey, locale, setLanguage, t } from "@timely/i18n";
+import { languageStorageKey, setLanguage, t } from "@timely/i18n";
 import {
   LanguageProvider,
   useLanguage,

@@ -17,7 +17,6 @@ import {
 } from "@timely/contracts";
 import {
   occurrenceTarget,
-  reduceRecord,
   remoteReminderCandidates,
 } from "@timely/sync";
 import { setState } from "@timely/domain";

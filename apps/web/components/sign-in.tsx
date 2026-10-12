@@ -1,6 +1,6 @@
 "use client";
 import { LanguageChoice } from "./language";
-import { t, locale, errorMessage, getLanguage } from "@timely/i18n";
+import { t, errorMessage, getLanguage } from "@timely/i18n";
 import { useLanguage } from "./language-state";
 
 import { useEffect, useRef, useState } from "react";

@@ -167,6 +167,13 @@ export const snapshotItems = timelySchema.table(
   },
   (t) => [primaryKey({ columns: [t.ownerId, t.token, t.position] })],
 );
+/** Durable reconciliation lease/backoff; separate from delivery jobs and sync cursors. */
+export const notificationReconciliations = timelySchema.table("notification_reconciliations", {
+  ownerId: owner().primaryKey(),
+  lastAttempt: bigint("last_attempt", { mode: "number" }).notNull().default(0),
+  nextAttempt: bigint("next_attempt", { mode: "number" }).notNull().default(0),
+  attempts: integer("attempts").notNull().default(0),
+});
 export const notificationDevices = timelySchema.table(
   "notification_devices",
   {

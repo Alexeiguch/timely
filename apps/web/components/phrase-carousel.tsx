@@ -1,7 +1,7 @@
 "use client";
 import { t } from "@timely/i18n";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLanguage } from "./language-state";
 import {
   cardOffset,
@@ -55,6 +55,7 @@ export function PhraseCarousel() {
   const index = useRef(0);
   const front = useRef(0);
   const drag = useRef<Drag | null>(null);
+  const detachPointer = useRef<(() => void) | null>(null);
   const [active, setActive] = useState(0);
   const [frontIndex, setFrontIndex] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -98,7 +99,7 @@ export function PhraseCarousel() {
     const under = next < -0.5 ? front.current + 1 : next > 0.5 ? front.current - 1 : -1;
     reveal(under);
   }
-  function showFront(next: number) {
+  const showFront = useCallback((next: number) => {
     for (let i = 0; i < count; i += 1) {
       const card = cards.current[i];
       if (!card) continue;
@@ -109,7 +110,7 @@ export function PhraseCarousel() {
     front.current = next;
     offset.current = 0;
     setFrontIndex(next);
-  }
+  }, [count]);
   function commit(target: number, velocity = 0) {
     const fromIndex = front.current;
     const from = readX(fromIndex);
@@ -155,84 +156,135 @@ export function PhraseCarousel() {
   useEffect(() => {
     showFront(front.current);
     const node = viewport.current;
-    if (!node) return;
-    const observer = new ResizeObserver(() => {
-      if (drag.current?.axis === "x" || animation.current) return;
-      showFront(index.current);
-    });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-
-  function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (!event.isPrimary || event.button !== 0) return;
-    if (event.pointerType === "mouse") event.preventDefault();
-    if (animation.current) {
-      const running = animation.current;
-      animation.current = null;
-      running.cancel();
-      showFront(index.current);
-    }
-    setDragging(true);
-    drag.current = {
-      pointer: event.pointerId,
-      originX: event.clientX,
-      originY: event.clientY,
-      samples: [{ x: event.clientX, t: event.timeStamp }],
-      axis: null,
+    const observer = node
+      ? new ResizeObserver(() => {
+          if (drag.current?.axis === "x" || animation.current) return;
+          showFront(index.current);
+        })
+      : null;
+    if (node && observer) observer.observe(node);
+    return () => {
+      observer?.disconnect();
+      detachPointer.current?.();
     };
+  }, [showFront]);
+
+  function stopPointer() {
+    detachPointer.current?.();
+    detachPointer.current = null;
   }
-  function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+  function trackMove(
+    clientX: number,
+    clientY: number,
+    timeStamp: number,
+    pointerId: number,
+  ) {
     const current = drag.current;
-    if (!current || current.pointer !== event.pointerId) return;
-    const dx = event.clientX - current.originX;
-    const dy = event.clientY - current.originY;
+    if (!current || current.pointer !== pointerId) return;
+    const dx = clientX - current.originX;
+    const dy = clientY - current.originY;
     if (!current.axis) {
       if (Math.hypot(dx, dy) < 8) return;
       current.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
-      if (current.axis === "y") return;
-      try {
-        event.currentTarget.setPointerCapture(event.pointerId);
-      } catch {
-        /* A synthetic pointer has no capture target. The move still tracks. */
+      if (current.axis === "x") {
+        const node = viewport.current;
+        try {
+          node?.setPointerCapture(pointerId);
+        } catch {
+          /* Synthetic pointers have nothing to capture. */
+        }
       }
     }
     if (current.axis !== "x") return;
-    current.samples.push({ x: event.clientX, t: event.timeStamp });
+    current.samples.push({ x: clientX, t: timeStamp });
     apply(cardOffset(dx, front.current, count, width()));
   }
-  function finish(event: React.PointerEvent<HTMLDivElement>) {
+  function finishPointer(
+    clientX: number,
+    clientY: number,
+    timeStamp: number,
+    pointerId: number,
+  ) {
     const current = drag.current;
-    if (!current || current.pointer !== event.pointerId) return;
+    if (!current || current.pointer !== pointerId) return;
     if (current.axis === "x")
-      current.samples.push({ x: event.clientX, t: event.timeStamp });
+      current.samples.push({ x: clientX, t: timeStamp });
     const velocity = velocityFrom(current.samples);
     const axis = current.axis;
     drag.current = null;
     setDragging(false);
-    if (event.currentTarget.hasPointerCapture(event.pointerId))
-      event.currentTarget.releasePointerCapture(event.pointerId);
+    stopPointer();
+    const node = viewport.current;
+    if (node?.hasPointerCapture(pointerId)) node.releasePointerCapture(pointerId);
     if (axis !== "x") {
       apply(0);
       return;
     }
-    const span = width();
+    const suppressClick = (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      window.removeEventListener("click", suppressClick, true);
+    };
+    window.addEventListener("click", suppressClick, true);
+    window.setTimeout(
+      () => window.removeEventListener("click", suppressClick, true),
+      400,
+    );
     commit(
       settleIndex({
         index: index.current,
         count,
         offset: offset.current,
         originOffset: 0,
-        span,
+        span: width(),
         velocity,
         axis,
       }),
-      axis === "x" ? velocity : 0,
+      velocity,
     );
   }
-  function onPointerLeave(event: React.PointerEvent<HTMLDivElement>) {
-    if (drag.current?.axis === "x") return;
-    finish(event);
+  function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (!event.isPrimary || event.button !== 0) return;
+    if (event.pointerType === "mouse") event.preventDefault();
+    if (drag.current) {
+      finishPointer(
+        event.clientX,
+        event.clientY,
+        event.timeStamp,
+        drag.current.pointer,
+      );
+    }
+    if (animation.current) {
+      const running = animation.current;
+      animation.current = null;
+      running.cancel();
+      showFront(index.current);
+    }
+    const pointerId = event.pointerId;
+    setDragging(true);
+    drag.current = {
+      pointer: pointerId,
+      originX: event.clientX,
+      originY: event.clientY,
+      samples: [{ x: event.clientX, t: event.timeStamp }],
+      axis: null,
+    };
+    const move = (native: PointerEvent) => {
+      if (native.pointerId !== pointerId) return;
+      trackMove(native.clientX, native.clientY, native.timeStamp, pointerId);
+    };
+    const up = (native: PointerEvent) => {
+      if (native.pointerId !== pointerId) return;
+      finishPointer(native.clientX, native.clientY, native.timeStamp, pointerId);
+    };
+    window.addEventListener("pointermove", move, true);
+    window.addEventListener("pointerup", up, true);
+    window.addEventListener("pointercancel", up, true);
+    detachPointer.current = () => {
+      window.removeEventListener("pointermove", move, true);
+      window.removeEventListener("pointerup", up, true);
+      window.removeEventListener("pointercancel", up, true);
+    };
   }
   function onKeyDown(event: React.KeyboardEvent<HTMLElement>) {
     if (event.key === "ArrowRight") {
@@ -264,10 +316,6 @@ export function PhraseCarousel() {
         tabIndex={0}
         aria-label={t("Inspiring phrases")}
         onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={finish}
-        onPointerCancel={finish}
-        onPointerLeave={onPointerLeave}
       >
         {phrases.map((phrase, position) => (
           <article

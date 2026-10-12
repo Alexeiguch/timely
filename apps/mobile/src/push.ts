@@ -9,32 +9,34 @@ import {
 } from "@timely/sync";
 import { apiURL, authenticatedFetch } from "./auth";
 import { notificationPermission } from "./notifications";
-async function bounded<T>(work: Promise<T>, timeoutMs = 8000): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      work,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error("Push registration unavailable")),
-          timeoutMs,
-        );
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
+class PushRequests {
+  static async bounded<T>(work: Promise<T>, timeoutMs = 8000): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        work,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("Push registration unavailable")),
+            timeoutMs,
+          );
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
-}
-async function timedFetch(path: string, init?: RequestInit) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
-  try {
-    return await authenticatedFetch(path, {
-      ...init,
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timer);
+  static async fetch(path: string, init?: RequestInit) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      return await authenticatedFetch(path, {
+        ...init,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
   }
 }
 let cachedToken: { projectId: string; token: string } | undefined;
@@ -44,7 +46,7 @@ export function invalidatePushToken() {
 export function createPushCoverage(): ReminderCoverageAdapter {
   const request = (state: LocalState, path: string, body: unknown) =>
     httpTransport((url, init) =>
-      timedFetch(url, {
+      PushRequests.fetch(url, {
         ...init,
         headers: { ...init?.headers, "X-Timely-Account": state.ownerId },
       }),
@@ -84,7 +86,9 @@ export function createPushCoverage(): ReminderCoverageAdapter {
           cachedToken = {
             projectId,
             token: (
-              await bounded(Notifications.getExpoPushTokenAsync({ projectId }))
+              await PushRequests.bounded(
+                Notifications.getExpoPushTokenAsync({ projectId }),
+              )
             ).data,
           };
         token = cachedToken.token;
@@ -119,7 +123,7 @@ export function createPushCoverage(): ReminderCoverageAdapter {
 }
 export async function sendPushTest(state: LocalState) {
   await httpTransport((url, init) =>
-    timedFetch(url, {
+    PushRequests.fetch(url, {
       ...init,
       headers: { ...init?.headers, "X-Timely-Account": state.ownerId },
     }),

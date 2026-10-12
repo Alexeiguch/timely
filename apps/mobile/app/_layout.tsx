@@ -1,5 +1,5 @@
 import { LanguageRoot } from "../src/language";
-import { t, locale } from "@timely/i18n";
+import { t } from "@timely/i18n";
 import { useLanguage } from "../src/language-state";
 import { Stack, type ErrorBoundaryProps } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";

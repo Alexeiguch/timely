@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { runPushWorker } from "../apps/web/server/push-worker";
-import { notificationRepository } from "@timely/db/notifications";
+import { notificationRepository } from "../packages/db/src/notifications";
 import { expoPush } from "../apps/web/server/expo-push";
 import { randomUUID } from "node:crypto";
 const now = Date.parse("2026-10-08T09:00:00Z");
@@ -17,6 +17,7 @@ function fixture() {
   const repo = {
     recover: vi.fn().mockResolvedValue(undefined),
     owners: vi.fn().mockResolvedValue([job.ownerId]),
+    reconciliationFailed: vi.fn().mockResolvedValue(undefined),
     reconcile: vi.fn().mockResolvedValue(undefined),
     due: vi.fn().mockResolvedValue([job]),
     claim: vi.fn().mockResolvedValue({
@@ -57,6 +58,8 @@ it("rechecks canonical claims before sending and does not leak content in worker
   expect(await f.run()).toEqual({
     enabled: true,
     reconciled: 1,
+    failedOwners: 0,
+    failedJobs: 0,
     sent: 0,
     receipts: 0,
   });
@@ -69,6 +72,8 @@ it("sends localized tests with the recipient's backend origin and bounded expira
   expect(result).toEqual({
     enabled: true,
     reconciled: 1,
+    failedOwners: 0,
+    failedJobs: 0,
     sent: 1,
     receipts: 0,
   });
@@ -150,4 +155,71 @@ it("keeps the provider dispatch limit at twenty successful claims", async () => 
   expect((await f.run()).sent).toBe(20);
   expect(f.repo.claim).toHaveBeenCalledTimes(20);
   expect(f.provider.send).toHaveBeenCalledTimes(20);
+});
+
+it("isolates a corrupt owner, persists its retry and still dispatches and checks receipts", async () => {
+  const f = fixture();
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  const bad = randomUUID();
+  f.repo.owners.mockResolvedValue([bad, f.job.ownerId]);
+  f.repo.reconcile.mockRejectedValueOnce(new Error("private task content"));
+  const result = await f.run();
+  expect(result).toMatchObject({ reconciled: 1, failedOwners: 1, sent: 1 });
+  expect(f.repo.reconciliationFailed).toHaveBeenCalledWith(bad, now);
+  expect(f.provider.receipts).toHaveBeenCalled();
+  expect(JSON.stringify(log.mock.calls)).not.toMatch(
+    new RegExp(`private task content|${bad}`),
+  );
+  log.mockRestore();
+});
+it("does not let a job claim failure block another job", async () => {
+  const f = fixture();
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  f.repo.due.mockResolvedValue([f.job, { ...f.job, key: randomUUID() }]);
+  f.repo.claim.mockRejectedValueOnce(new Error("bad owner"));
+  expect(await f.run()).toMatchObject({ sent: 1, failedJobs: 1 });
+  log.mockRestore();
+});
+it("marks thrown sends uncertain without stopping the remaining jobs", async () => {
+  const f = fixture();
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  f.repo.due.mockResolvedValue([f.job, { ...f.job, key: randomUUID() }]);
+  f.provider.send.mockRejectedValueOnce(new Error("response lost"));
+  expect(await f.run()).toMatchObject({ sent: 1, failedJobs: 1 });
+  expect(f.repo.finish).toHaveBeenCalledWith(
+    f.job,
+    { status: "uncertain", error: "DispatchInterrupted" },
+    now,
+  );
+  log.mockRestore();
+});
+it("continues owner work even if persisting a failure retry fails", async () => {
+  const f = fixture();
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  f.repo.owners.mockResolvedValue([randomUUID(), f.job.ownerId]);
+  f.repo.reconcile.mockRejectedValueOnce(new Error("bad record"));
+  f.repo.reconciliationFailed.mockRejectedValueOnce(new Error("DB outage"));
+  expect(await f.run()).toMatchObject({
+    sent: 1,
+    reconciled: 1,
+    failedOwners: 1,
+  });
+  log.mockRestore();
+});
+
+it("continues receipt processing after one owner transaction fails", async () => {
+  const f = fixture();
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  f.repo.due.mockResolvedValue([]);
+  const first = { ...f.job, receiptId: "first-receipt" };
+  const second = { ...f.job, key: randomUUID(), receiptId: "second-receipt" };
+  f.repo.receipts.mockResolvedValue([first, second]);
+  f.provider.receipts.mockResolvedValue({
+    "first-receipt": { status: "delivered" },
+    "second-receipt": { status: "delivered" },
+  });
+  f.repo.finish.mockRejectedValueOnce(new Error("bad stored record"));
+  expect(await f.run()).toMatchObject({ receipts: 1, failedJobs: 1 });
+  expect(f.repo.finish).toHaveBeenCalledTimes(2);
+  log.mockRestore();
 });

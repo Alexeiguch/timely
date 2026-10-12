@@ -16,38 +16,52 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
-export async function notificationPermission() {
-  const permission = await Notifications.getPermissionsAsync();
-  return permission.granted ||
-    permission.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
-    ? ("granted" as const)
-    : permission.canAskAgain
-      ? ("undetermined" as const)
-      : ("denied" as const);
-}
-export async function requestReminderPermission() {
-  if ((await notificationPermission()) !== "undetermined") return;
-  const accepted = await new Promise<boolean>((resolve) =>
-    Alert.alert(
-      t("Reminders for your plans"),
-      t(
-        "Allow Timely to notify you before a task and when it becomes overdue. You can change this in Settings.",
+class NativeNotifications {
+  static async permission() {
+    const permission = await Notifications.getPermissionsAsync();
+    return permission.granted ||
+      permission.ios?.status ===
+        Notifications.IosAuthorizationStatus.PROVISIONAL
+      ? ("granted" as const)
+      : permission.canAskAgain
+        ? ("undetermined" as const)
+        : ("denied" as const);
+  }
+  static async requestPermission() {
+    if ((await NativeNotifications.permission()) !== "undetermined") return;
+    const accepted = await new Promise<boolean>((resolve) =>
+      Alert.alert(
+        t("Reminders for your plans"),
+        t(
+          "Allow Timely to notify you before a task and when it becomes overdue. You can change this in Settings.",
+        ),
+        [
+          { text: t("Later"), style: "cancel", onPress: () => resolve(false) },
+          { text: t("Continue"), onPress: () => resolve(true) },
+        ],
+        { cancelable: true, onDismiss: () => resolve(false) },
       ),
-      [
-        { text: t("Later"), style: "cancel", onPress: () => resolve(false) },
-        { text: t("Continue"), onPress: () => resolve(true) },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    ),
-  );
-  if (!accepted) return;
-  if (Platform.OS === "android")
-    await Notifications.setNotificationChannelAsync("plans", {
-      name: t("Task reminders"),
-      importance: Notifications.AndroidImportance.DEFAULT,
-    });
-  await Notifications.requestPermissionsAsync();
+    );
+    if (!accepted) return;
+    if (Platform.OS === "android")
+      await Notifications.setNotificationChannelAsync("plans", {
+        name: t("Task reminders"),
+        importance: Notifications.AndroidImportance.DEFAULT,
+      });
+    await Notifications.requestPermissionsAsync();
+  }
+  static async flushCleanup() {
+    for (const ownerId of await pendingNotificationCleanup()) {
+      for (const entry of await notificationAdapter.scheduled())
+        if (entry.ownerId === ownerId)
+          await notificationAdapter.cancel(entry.nativeId);
+      await finishNotificationCleanup(ownerId);
+    }
+  }
 }
+export const notificationPermission = NativeNotifications.permission;
+export const requestReminderPermission = NativeNotifications.requestPermission;
+export const flushNotificationCleanup = NativeNotifications.flushCleanup;
 export const notificationAdapter: NotificationAdapter = {
   permission: notificationPermission,
   async scheduled() {
@@ -107,11 +121,3 @@ export const notificationAdapter: NotificationAdapter = {
     });
   },
 };
-export async function flushNotificationCleanup() {
-  for (const ownerId of await pendingNotificationCleanup()) {
-    for (const entry of await notificationAdapter.scheduled())
-      if (entry.ownerId === ownerId)
-        await notificationAdapter.cancel(entry.nativeId);
-    await finishNotificationCleanup(ownerId);
-  }
-}

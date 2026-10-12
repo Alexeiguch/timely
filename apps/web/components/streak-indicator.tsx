@@ -4,7 +4,6 @@ import { Check, Flame, X } from "lucide-react";
 import type { Occurrence } from "@timely/contracts";
 import {
   boundaries,
-  date,
   formatCivilDate,
   streakOutcome,
   type Streak,

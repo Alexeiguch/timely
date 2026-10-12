@@ -29,11 +29,11 @@ import {
   addDays,
   adjacentPeriod,
   formatCivilDate,
-  clampDay,
   compareOccurrences,
   date,
   periodWindow,
   progress,
+  overdueOccurrences,
   projectSeries,
   status,
   type PlannerMode,
@@ -60,7 +60,7 @@ type Row =
       id: string;
     };
 export function NativePlanner() {
-  const language = useLanguage();
+  useLanguage();
   const p = usePlanner();
   const account = useAccount();
   const insets = useSafeAreaInsets();
@@ -88,24 +88,8 @@ export function NativePlanner() {
     [series, window.from, window.through],
   );
   const overdue = useMemo(
-    () =>
-      p.mode === "Day" && p.selected === p.currentDay
-        ? series
-            .flatMap((record) =>
-              projectSeries(
-                record,
-                clampDay(addDays(p.currentDay, -365)),
-                p.currentDay,
-              ),
-            )
-            .filter(
-              (item) =>
-                item.schedule.date < p.currentDay &&
-                status(item, p.zone, p.now) === "overdue",
-            )
-            .sort(compareOccurrences)
-        : [],
-    [series, p.mode, p.selected, p.currentDay, p.zone, p.now],
+    () => overdueOccurrences(series, p.selected, p.mode, p.zone, p.now),
+    [series, p.selected, p.mode, p.zone, p.now],
   );
   const totals = progress(all, p.zone, p.now);
   const visible =
@@ -241,14 +225,7 @@ export function NativePlanner() {
     p.setMode("Day");
     processedLink.current = key;
     setLinkMessage("");
-  }, [
-    params.day,
-    params.occurrenceId,
-    params.ownerId,
-    p.state,
-    p.records,
-    account.identity?.id,
-  ]);
+  }, [params, p, account.identity?.id]);
   // Resolve a linked/selected card against current records after each edit; never retain a deleted snapshot.
   const focus =
     focused && account.identity

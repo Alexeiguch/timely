@@ -1,4 +1,4 @@
-import { t, locale, errorMessage, recurrenceText } from "@timely/i18n";
+import { t, errorMessage, recurrenceText } from "@timely/i18n";
 import { useLanguage } from "./language-state";
 import { useMemo, useState } from "react";
 import { Alert, Keyboard, Switch, Text, View } from "react-native";
@@ -94,7 +94,6 @@ export function TaskEditor({
   const save = async (scope?: Scope) => {
     const parsed = taskSchema.safeParse(task);
     if (!parsed.success) {
-      const issue = parsed.error.issues[0];
       setError(t("Check the task fields."));
       return;
     }

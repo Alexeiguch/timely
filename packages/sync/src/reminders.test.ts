@@ -114,7 +114,6 @@ it("recovers an interrupted native call without duplicating it and cancels offli
 });
 it("reports local coverage only after OS scheduling and keeps dispatch paused for unsynced work", async () => {
   const calls: string[] = [];
-  let f: ReturnType<typeof fixture>;
   const coverage: ReminderCoverageAdapter = {
     prepare: async () => {
       calls.push("prepare");
@@ -127,7 +126,7 @@ it("reports local coverage only after OS scheduling and keeps dispatch paused fo
       return { ready: true, retry: false };
     },
   };
-  f = fixture(coverage);
+  const f = fixture(coverage);
   await f.add();
   await f.scheduler.run(f.now);
   expect(calls).toEqual(["prepare"]);

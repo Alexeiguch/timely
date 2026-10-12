@@ -128,25 +128,22 @@ test("friendly duration and weekdays survive reload, and month markers follow sw
   ) => {
     await grid.evaluate(
       (element, { from, through }) => {
-        const touch = (point: [number, number]) =>
-          new Touch({
-            identifier: 1,
-            target: element,
-            clientX: point[0],
-            clientY: point[1],
+        const point = (
+          type: "pointerdown" | "pointerup",
+          value: [number, number],
+        ) =>
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            pointerId: 1,
+            pointerType: "touch",
+            isPrimary: true,
+            button: 0,
+            clientX: value[0],
+            clientY: value[1],
           });
-        element.dispatchEvent(
-          new TouchEvent("touchstart", {
-            bubbles: true,
-            touches: [touch(from)],
-          }),
-        );
-        element.dispatchEvent(
-          new TouchEvent("touchend", {
-            bubbles: true,
-            changedTouches: [touch(through)],
-          }),
-        );
+        element.dispatchEvent(point("pointerdown", from));
+        window.dispatchEvent(point("pointerup", through));
       },
       { from, through },
     );

@@ -1,5 +1,5 @@
 "use client";
-import { t, locale } from "@timely/i18n";
+import { t } from "@timely/i18n";
 import { useLanguage } from "../components/language-state";
 
 import { useEffect, useState } from "react";

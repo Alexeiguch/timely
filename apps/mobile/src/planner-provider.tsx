@@ -3,6 +3,7 @@ import { useLanguage } from "./language-state";
 import {
   createContext,
   useContext,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -139,7 +140,7 @@ export function PlannerProvider({
   const [undoing, setUndoing] = useState(false);
   const alive = useRef(true);
   const store = useMemo(() => localStore(ownerId), [ownerId]);
-  const pushCoverage = useMemo(() => createPushCoverage(), [ownerId]);
+  const pushCoverage = useMemo(() => createPushCoverage(), []);
   const accountApi = useMemo(
     () => accountActions(authenticatedFetch, ownerId),
     [ownerId],
@@ -152,15 +153,15 @@ export function PlannerProvider({
         () => Intl.DateTimeFormat().resolvedOptions().timeZone,
         pushCoverage,
       ),
-    [store],
+    [store, pushCoverage],
   );
-  const reconcileReminders = () =>
+  const reconcileReminders = useCallback(() =>
     reminders.run().catch(() => {
       if (alive.current)
         setMessage(
           "Some reminders could not be updated. Open Settings to retry.",
         );
-    });
+    }), [reminders]);
   const engine = useMemo(
     () =>
       new SyncEngine(
@@ -194,7 +195,7 @@ export function PlannerProvider({
       ),
     [store, ownerId],
   );
-  const reload = () => {
+  const reload = useCallback(() => {
     void store
       .read()
       .then((value) => {
@@ -209,7 +210,7 @@ export function PlannerProvider({
             "Your local plans could not be opened. Retry without clearing your data.",
           );
       });
-  };
+  }, [store]);
   const runSync = () => {
     setSyncStatus("Syncing");
     return engine.run(true).catch(() => {
@@ -254,7 +255,7 @@ export function PlannerProvider({
       foreground.remove();
       network.remove();
     };
-  }, [store, engine]);
+  }, [store, engine, reload, reconcileReminders]);
   useEffect(() => {
     if (!undo) return;
     const timer = setTimeout(
@@ -281,6 +282,7 @@ export function PlannerProvider({
     state?.cursor,
     state?.outbox.length,
     language,
+    reconcileReminders,
   ]);
   useEffect(() => {
     const open = async (response: Notifications.NotificationResponse) => {

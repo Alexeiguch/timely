@@ -1,3 +1,4 @@
+import { ServerDiagnostics } from "./diagnostics";
 import { randomUUID } from "node:crypto";
 import { auth } from "@timely/auth/server";
 import { CommandError } from "@timely/sync";
@@ -87,12 +88,22 @@ export async function authenticated(
             : 400
           : validation?.name === "ZodError"
             ? 400
-            : 503;
+            : ServerDiagnostics.unavailable(error)
+              ? 503
+              : 500;
     const code = known
       ? error.code
       : status === 400
         ? "INVALID_COMMAND"
-        : "TEMPORARY_UNAVAILABLE";
+        : status === 503
+          ? "TEMPORARY_UNAVAILABLE"
+          : "INTERNAL_ERROR";
+    if (status >= 500)
+      ServerDiagnostics.failure("api_failure", error, {
+        requestId,
+        method: request.method,
+        path: new URL(request.url).pathname,
+      });
     return Response.json(
       {
         code,

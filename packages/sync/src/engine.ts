@@ -207,12 +207,24 @@ export function httpTransport(
         cache: "no-store",
         signal: controller.signal,
       });
-      const result = await response.json();
+      const result = await response.json().catch(() => {
+        if (response.ok)
+          throw new SyncError(
+            502,
+            "INVALID_RESPONSE",
+            "Synchronization is temporarily unavailable. Your local changes are safe.",
+          );
+        return null;
+      });
       if (!response.ok)
         throw new SyncError(
           response.status,
-          result.code ?? "TEMPORARY_UNAVAILABLE",
-          result.message ?? "Unable to synchronize.",
+          typeof result?.code === "string"
+            ? result.code
+            : "TEMPORARY_UNAVAILABLE",
+          typeof result?.message === "string"
+            ? result.message
+            : "Synchronization is temporarily unavailable. Your local changes are safe.",
           Number(response.headers.get("Retry-After") ?? 0) * 1000,
         );
       return result;
@@ -429,7 +441,9 @@ export class SyncEngine {
       this.status(
         known?.status === 401 || known?.status === 400 || known?.status === 403
           ? "Needs attention"
-          : "Offline",
+          : known
+            ? "Needs attention"
+            : "Offline",
         known?.message ?? "Your changes are saved on this device.",
       );
     }

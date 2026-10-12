@@ -1,4 +1,4 @@
-import { t, locale, errorMessage } from "@timely/i18n";
+import { t, errorMessage } from "@timely/i18n";
 import { useLanguage } from "../../src/language-state";
 import { Tabs } from "expo-router";
 import { Text, View, StyleSheet, useWindowDimensions } from "react-native";

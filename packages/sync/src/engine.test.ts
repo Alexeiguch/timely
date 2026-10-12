@@ -2,11 +2,11 @@ import { expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
 import {
   initialState,
+  httpTransport,
   saveLocal,
   SyncEngine,
   SyncError,
   visibleRecords,
-  type LocalState,
   type LocalStore,
   type SyncStatus,
   type Transport,
@@ -322,4 +322,44 @@ it("isolates a rejected atomic batch before blocking one command and recovers un
   await store.transaction((state) => { state.outbox = state.outbox.filter((pending) => pending.operation.definitionId !== blocked.id); });
   await engine.run(true);
   expect(remote.has(last.id)).toBe(true); expect((await store.read()).outbox).toHaveLength(0);
+});
+
+it.each([500, 503, 429])("shows server failure %s without claiming the device is offline or discarding saved edits", async (status) => {
+  const store = memory();
+  const item = task();
+  await saveLocal(store, item.id, { type: "create", task: item }, randomUUID);
+  const before = await store.read();
+  const states: SyncStatus[] = [];
+  const engine = new SyncEngine(store, async () => { throw new SyncError(status, "INTERNAL_ERROR", "Server unavailable"); }, "web", () => "UTC", (state) => states.push(state));
+  await engine.run();
+  expect(states.at(-1)).toBe("Needs attention");
+  expect((await store.read()).outbox).toEqual(before.outbox);
+  expect(visibleRecords(await store.read()).records).toHaveLength(1);
+});
+
+it.each([500, 503])("keeps non-JSON HTTP %s responses classified as server failures", async (status) => {
+  const transport = httpTransport(async () => new Response("Proxy failed", { status }));
+  await expect(transport("devices/register")).rejects.toMatchObject({ status, code: "TEMPORARY_UNAVAILABLE" });
+});
+it("rejects invalid successful JSON as a protocol error", async () => {
+  const transport = httpTransport(async () => new Response("Not JSON", { status: 200 }));
+  await expect(transport("sync/bootstrap")).rejects.toMatchObject({ status: 502, code: "INVALID_RESPONSE" });
+});
+it.each([500, 503])("retains the sent outbox and schedules a retry after HTTP %s", async (status) => {
+  const store = memory();
+  const item = task();
+  await saveLocal(store, item.id, { type: "create", task: item }, randomUUID);
+  const online = reachable();
+  const states: SyncStatus[] = [];
+  const engine = new SyncEngine(store, async (path, body) => {
+    if (path === "sync/push") throw new SyncError(status, "INTERNAL_ERROR", "Server unavailable");
+    return online(path, body);
+  }, "web", () => "UTC", (state) => states.push(state));
+  await engine.run();
+  const pending = (await store.read()).outbox;
+  expect(pending).toHaveLength(1);
+  expect(pending[0]!.attempts).toBe(1);
+  expect(pending[0]!.retryAt).toBeGreaterThan(Date.now());
+  expect(pending[0]!.error).toBeUndefined();
+  expect(states.at(-1)).toBe("Needs attention");
 });

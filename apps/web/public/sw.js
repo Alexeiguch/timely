@@ -1,6 +1,6 @@
 // Only the public client shell, app icons and immutable build assets enter the cache.
 // Auth/API responses, RSC requests, task content and other navigation paths never do.
-const CACHE = "timely-public-shell-v3";
+const CACHE = "timely-public-shell-v4";
 const icon = (url) => ["/favicon.ico", "/icon.svg"].includes(url.pathname);
 const asset = (url) =>
   url.origin === self.location.origin &&
