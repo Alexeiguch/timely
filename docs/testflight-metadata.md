@@ -1,0 +1,53 @@
+# TestFlight metadata — 2026-10-12
+
+App: Timely · App Store Connect `6821749473` · bundle `com.example.timely.dev`.
+
+The owner authorized the native TestFlight update, icon, description and screenshots. Build **0.1.0 (2)** is uploaded, processed and **Validated** by Apple, with access assigned to the existing **Internal** group (two testers). Build ID: `b74b1508-1e7e-41a4-ae58-7b29889a356e`. [Build details](https://appstoreconnect.apple.com/teams/a28c13e4-e219-4fdb-bf39-5ffa7d2acc6b/apps/6821749473/testflight/ios/b74b1508-1e7e-41a4-ae58-7b29889a356e).
+
+The existing opaque 1024 × 1024 Timely brand icon is embedded in the uploaded asset catalog. Archive signature, marketing icon, version, bundle identity, non-exempt encryption flag and production API URL were verified. The native build uses `2f9f9f4` (application changes in `3103e52`) with the owner's store configuration; the development native project was preserved. No App Store review submission or external tester group was created.
+
+## Beta description: Spanish (Mexico)
+
+Timely es tu agenda personal para organizar el día y crear hábitos a tu ritmo.
+
+Planifica tareas en las vistas Día, Semana y Mes. Añade horarios, duración, prioridades y repeticiones; completa o mueve una tarea cuando cambien tus planes. Activa rachas en las tareas recurrentes y revisa tu progreso y tu historial.
+
+Tus cambios se guardan en el dispositivo incluso sin conexión y se sincronizan con tu cuenta al volver a conectarte. La app está disponible en español e inglés.
+
+Durante esta beta, prueba la planificación, las repeticiones, las rachas, la búsqueda y la sincronización entre dispositivos. Comparte tus comentarios desde TestFlight.
+
+## Beta description: English (US)
+
+Timely is your personal planner for organizing your day and building habits at your own pace.
+
+Plan tasks in Day, Week and Month views. Add times, durations, priorities and repeat schedules, then complete or move tasks as your plans change. Enable streaks for recurring tasks and review your progress and history.
+
+Your edits are saved on your device even when you are offline and sync with your account when you reconnect. Timely is available in Spanish and English.
+
+During this beta, try planning, recurring tasks, streaks, search and synchronization across devices. Share feedback through TestFlight.
+
+Both descriptions were saved in App Store Connect. The existing feedback/review/contact fields were preserved.
+
+## Screenshot placement
+
+Apple's TestFlight invitation experience uses screenshots from the latest **Ready for Distribution** App Store version. This app currently has a **Prepare for Submission** draft (1.0). Screenshots can be uploaded to that draft, but will not become TestFlight invitation screenshots before an App Store version is approved. No public App Store submission is authorized by this update.
+
+Five actual native screenshots are saved in the Spanish (Mexico) draft listing: iPhone Day, Month and completed-task Review; iPad Day and Month. Apple accepted their original resolutions, **1206 × 2622** and **2064 × 2752**. Native JPEG capture avoids alpha channels. The screenshots were checked after navigating away and returning to the draft; the listing shows three iPhone and two iPad screenshots. Files and SHA-256 hashes are in [the screenshot manifest](app-store/screenshots/manifest.json).
+
+The latest simulator Release binary signed into a newly created synthetic account through real hosted email OTP authentication and synchronized all seven authored tasks, including one completion. No mocked authentication or persistence was used. After capture, only that exact synthetic account and its cascading test data were removed; temporary authentication material was deleted. Both disposable listing simulators were shut down. These checks do not establish physical-device provider/reminder acceptance.
+
+## Build testing notes
+
+Saved in Spanish (Mexico) and English (US) for build 2. They ask testers to check task creation, editing, completion and moves; recurrence and streaks; history search; retained offline edits and reconnection; consistent overdue lists across web/native; and synchronization recovery after connection failure.
+
+## Artifacts and continuation
+
+- Local archive/export: `/tmp/timely-testflight-20261012/Timely.xcarchive`, `/tmp/timely-testflight-20261012/ipa/Timely.ipa`.
+- Durable ignored IPA/manifest: `.local/releases/2026-10-12/testflight-build-2/`.
+- Build, simulator and upload logs: `/tmp/timely-testflight-20261012/{build,simulator-build,upload}.log`; all commands exited 0.
+- UI proof: `.local/testflight-20261012/{build-2-internal,beta-description-saved,iphone-screenshots-saved,ipad-screenshots-saved}.png`.
+- `pnpm --filter @timely/mobile typecheck` and `git diff --check` pass.
+- EAS iOS production build counter initialized to **2**; the next auto-incremented build should be **3**. Local Xcode builds must explicitly set `IOS_BUILD_NUMBER=3` or a later unused number.
+- A public App Store release is a separate owner-authorized action. The current draft is 1.0, while beta builds are 0.1.0. Before submitting, choose the public version, complete required privacy/support/review fields and native acceptance, and upload a matching build.
+
+References: [beta test information](https://developer.apple.com/help/app-store-connect/test-a-beta-version/provide-test-information/), [app icons](https://developer.apple.com/help/app-store-connect/manage-app-information/add-an-app-icon/), [screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications).

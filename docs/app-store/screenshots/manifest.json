@@ -1,0 +1,37 @@
+[
+  {
+    "file": "docs/app-store/screenshots/es-MX/ipad/01-day.jpg",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "37e5e5a6fce80f7eca39616aaaadfde3aed4311415c4d3f25d5f234f68e487ec",
+    "source": "iOS 26.2 simulator, actual app, real synthetic hosted account"
+  },
+  {
+    "file": "docs/app-store/screenshots/es-MX/ipad/02-month.jpg",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "1580745f2aec292db788e45dbcfa02c5a004bf6ca8a536378e88997019ae5dca",
+    "source": "iOS 26.2 simulator, actual app, real synthetic hosted account"
+  },
+  {
+    "file": "docs/app-store/screenshots/es-MX/iphone/01-day.jpg",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "e87e452c0429bfcd4833ba1518f8eabbd30b527da01c066fa1df6e0895953cf4",
+    "source": "iOS 26.2 simulator, actual app, real synthetic hosted account"
+  },
+  {
+    "file": "docs/app-store/screenshots/es-MX/iphone/02-month.jpg",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "0ae114d901acfbf4e7e01f220005389c70b485ea5d9a5532db33ae41dacc94ca",
+    "source": "iOS 26.2 simulator, actual app, real synthetic hosted account"
+  },
+  {
+    "file": "docs/app-store/screenshots/es-MX/iphone/03-review.jpg",
+    "width": 1206,
+    "height": 2622,
+    "sha256": "97bb5cba9304bfb8677e3d9650b7036cf2c3e15d7993e2da80c1e3448379e695",
+    "source": "iOS 26.2 simulator, actual app, real synthetic hosted account"
+  }
+]

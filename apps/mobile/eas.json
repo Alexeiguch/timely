@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">=18.0.0"
+    "version": ">=18.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -25,9 +26,25 @@
       }
     },
     "production": {
+      "distribution": "store",
       "autoIncrement": true,
       "env": {
-        "APP_VARIANT": "production"
+        "APP_VARIANT": "production",
+        "APP_IDENTIFIER": "com.example.timely.dev",
+        "APP_SCHEME": "timely-dev",
+        "APP_DISPLAY_NAME": "Timely",
+        "EXPO_PUBLIC_API_URL": "https://timely-mauve-five.vercel.app"
+      },
+      "ios": {
+        "buildConfiguration": "Release"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6821749473",
+        "appleTeamId": "2H4382Y5NM"
       }
     }
   }

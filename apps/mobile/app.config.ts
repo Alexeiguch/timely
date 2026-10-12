@@ -2,14 +2,18 @@ import type { ExpoConfig } from "expo/config";
 const variant = process.env.APP_VARIANT ?? "development";
 const suffix =
   variant === "production" ? "" : variant === "preview" ? ".preview" : ".dev";
-const scheme =
+const defaultScheme =
   variant === "production"
     ? "timely"
     : variant === "preview"
       ? "timely-preview"
       : "timely-dev";
+const scheme = (process.env.APP_SCHEME ?? defaultScheme).replace(/:\/\/$/, "");
+const name =
+  process.env.APP_DISPLAY_NAME ??
+  (variant === "production" ? "Timely" : `Timely (${variant})`);
 const config: ExpoConfig = {
-  name: variant === "production" ? "Timely" : `Timely (${variant})`,
+  name,
   slug: "timely",
   owner: "guchinale",
   version: "0.1.0",
@@ -19,20 +23,22 @@ const config: ExpoConfig = {
   userInterfaceStyle: "light",
   ios: {
     bundleIdentifier: `${process.env.APP_IDENTIFIER ?? "com.example.timely"}${suffix}`,
+    buildNumber: process.env.IOS_BUILD_NUMBER ?? "1",
     supportsTablet: true,
     usesAppleSignIn: true,
-    ...(variant === "development"
-      ? {
-          infoPlist: {
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false,
+      ...(variant === "development"
+        ? {
             NSAppTransportSecurity: {
               NSAllowsArbitraryLoads: false,
               NSAllowsLocalNetworking: true,
             },
             NSLocalNetworkUsageDescription:
               "Timely connects to the planner backend on your Mac for sign-in and sync during local development.",
-          },
-        }
-      : {}),
+          }
+        : {}),
+    },
   },
   android: {
     adaptiveIcon: {
