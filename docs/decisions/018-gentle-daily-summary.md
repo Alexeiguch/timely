@@ -13,3 +13,9 @@ Native summaries omit sounds, use a low-importance non-vibrating Android channel
 Validation: 192 unit/SQLite checks and 28 real PostgreSQL checks pass (220 total), including new count, empty/completed/skipped/deleted, DST, restart, policy/time edits, offline handoff, permission denial, OS budget, expiration and same-day duplicate regressions. The additive migration upgrade rehearsal preserves all existing rows and leaves existing devices opted out. All ten typechecks, ESLint/boundaries, web production build, iOS/Android Hermes exports and signed iOS simulator Release compilation pass. These are not physical-device delivery acceptance. Hosted Expo/Inngest credentials and complete iOS/Android runtime delivery remain `blocked_external`.
 
 Installed API references checked: [Expo Notifications 57.0.22](https://docs.expo.dev/versions/latest/sdk/notifications/), [Expo push payloads and priorities](https://docs.expo.dev/push-notifications/sending-notifications/).
+
+## Hosted cadence — 2026-10-13
+
+Use a three-minute Inngest cron (`*/3 * * * *`). One function run and its one durable step consume about 28,800 executions in a 30-day month, leaving headroom within the current free 50,000 allowance. Minute polling would use about 86,400. This polling delay stays within the existing five-minute daily-summary delivery window; the summary remains once per installation/date. Synthetic remote tests also retain five minutes of eligibility so a test created after a sweep survives the next one. The signing key authenticates hosted invocations; an event key is not required by this cron-only workflow. Re-sync the app after deploying the function definition.
+
+Pricing and setup references: [Inngest pricing](https://www.inngest.com/pricing), [app sync](https://www.inngest.com/docs/platform-and-operations/apps-and-syncs). Physical delivery remains a separate acceptance gate.

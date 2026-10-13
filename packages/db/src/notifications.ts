@@ -363,7 +363,8 @@ export function notificationRepository(db: DB = database()) {
           key: randomUUID(),
           kind: "test",
           due: now + 30000,
-          expires: now + 120000,
+          // Remain eligible through a hosted three-minute sweep and its jitter.
+          expires: now + 5 * 60000,
         });
         return { queued: true, delaySeconds: 30 };
       });

@@ -544,7 +544,12 @@ describe.skipIf(process.env.RUN_DB_TESTS !== "1")(
       await expect(
         repo!.test(ownerId, deviceId, testNow + 1000),
       ).rejects.toThrow("Wait a minute");
-      expect((await repo!.claim(job!, testNow + 31000))?.item).toBeNull();
+      // A test created just after a hosted sweep survives the next sweep.
+      const nextSweep = testNow + 3 * 60000;
+      expect((await repo!.due(nextSweep)).some((due) => due.key === job!.key)).toBe(
+        true,
+      );
+      expect((await repo!.claim(job!, nextSweep))?.item).toBeNull();
     });
     it("protects local ownership, pauses handoff and blocks local takeover after remote claim", async () => {
       const f = await create();

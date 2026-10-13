@@ -8,7 +8,8 @@ export const inngest = new Inngest({
 export const reminders = inngest.createFunction(
   {
     id: "reminder-sweep",
-    triggers: [{ cron: "* * * * *" }],
+    // One run plus one step every three minutes fits the free execution quota.
+    triggers: [{ cron: "*/3 * * * *" }],
     concurrency: 1,
     retries: 2,
   },
