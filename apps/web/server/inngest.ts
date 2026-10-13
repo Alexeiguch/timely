@@ -8,11 +8,11 @@ export const inngest = new Inngest({
 export const reminders = inngest.createFunction(
   {
     id: "reminder-sweep",
-    // One run plus one step every three minutes fits the free execution quota.
-    triggers: [{ cron: "*/3 * * * *" }],
+    triggers: [{ cron: "* * * * *" }],
     concurrency: 1,
     retries: 2,
   },
-  async ({ step }) =>
-    step.run("reconcile-dispatch-receipts", () => runPushWorker()),
+  // The worker persists each delivery transition in PostgreSQL. Avoid an extra
+  // metered step for the whole sweep while keeping short task alerts eligible.
+  async () => runPushWorker(),
 );

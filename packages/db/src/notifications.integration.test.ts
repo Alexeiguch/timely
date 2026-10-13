@@ -544,7 +544,7 @@ describe.skipIf(process.env.RUN_DB_TESTS !== "1")(
       await expect(
         repo!.test(ownerId, deviceId, testNow + 1000),
       ).rejects.toThrow("Wait a minute");
-      // A test created just after a hosted sweep survives the next sweep.
+      // A synthetic test survives a delayed hosted sweep.
       const nextSweep = testNow + 3 * 60000;
       expect((await repo!.due(nextSweep)).some((due) => due.key === job!.key)).toBe(
         true,
