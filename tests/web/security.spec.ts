@@ -35,5 +35,8 @@ test("uses fresh rendering nonces and enforces the production script policy", as
     "data-injected-script",
     "executed",
   );
-  await expect(page.getByRole("button", { name: /Google/ })).toBeVisible();
+  // Optional providers are hidden when unconfigured. A real language change
+  // proves React hydrated with the nonce policy intact in every environment.
+  await page.getByRole("button", { name: "English", exact: true }).click();
+  await expect(page.getByLabel("Email address", { exact: true })).toBeVisible();
 });
