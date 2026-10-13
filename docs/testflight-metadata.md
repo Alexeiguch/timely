@@ -71,3 +71,10 @@ Spanish: Prueba el editor de tareas más sencillo, las opciones de repetición, 
 Apple accepted **0.1.0 (4)** from `cd86f9c48f33b5f3048dd81bd88322727fa392bb`; Xcode reported `Upload succeeded` and `EXPORT SUCCEEDED`. The login brand is now 56px, with wrapping for narrow layouts. Processing completion/Internal assignment remain unverified. Build 2 is still the last independently verified Internal build; no public review submission occurred.
 
 Archive/export/logs: `/tmp/timely-login-logo-ios-20261013/`; durable IPA/manifest: `.local/releases/2026-10-13/testflight-build-4/`. SHA-256: `49f40cc4d6c1a820b67954739dd7791ece940ead267fb5cbcd787310ae7f9e10`. Signature, identity, production entitlement/API and embedded bundle checks pass. Vendor-framework symbol warnings are nonfatal. EAS production counter is **4**; next unused build is **5**. Browser control was stopped before further Apple UI verification.
+
+
+## Finite streak build 5 — 2026-10-13
+
+Apple accepted **0.1.0 (5)** from `7c0832e5d5085ee6756ccc8b8899493f1450f2c7`, with the larger login brand and three-cycle streak feedback. Xcode reported processing, `Upload succeeded` and `EXPORT SUCCEEDED`. Selected native/shared inputs, signature, identity, production entitlement/API, version and embedded bundle were verified. Processing completion/Internal tester access remain unverified; no public review submission occurred.
+
+Archive/export/logs: `/tmp/timely-streak-ios-20261013/`. Durable IPA/manifest/handoff: `.local/releases/2026-10-13/testflight-build-5/`. SHA-256: `ad50d00b38ad54d0549c3f6c3c9cbe7e026a3dc53e5e3124ae7e408378fa6324`. Vendor-framework dSYM warnings remain nonfatal. EAS production counter is **5**; next unused number **6**. Confirm the build's existing Internal group access in App Store Connect, then verify three pulses/resting state, foregrounding and reduced motion on a physical device. The browser session still requires sign-in; Expo has no App Store Connect API key.

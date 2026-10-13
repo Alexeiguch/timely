@@ -70,3 +70,8 @@ Application `8151368` is READY on [production](https://timely-mauve-five.vercel.
 ## Larger login logo — 2026-10-13
 
 Source `cd86f9c48f33b5f3048dd81bd88322727fa392bb` is published to [production](https://timely-mauve-five.vercel.app), clean-archive deployment `dpl_BnDQFzu98EVMYxJGTRMhUFDZJjAP` ([immutable URL](https://timely-6zg01j3rr-alexeiguchs-projects.vercel.app)). The production alias, larger logo at desktop/320px, no horizontal overflow, fresh CSP/HSTS and authentication/origin boundaries are verified. [CI passes](https://github.com/Alexeiguch/timely/actions/runs/38441802968). No schema, environment, provider or DNS changes were needed for this visual update.
+
+
+## Finite streak animation — 2026-10-13
+
+Final combined source `a4ee1a1e983b7930c27788014eaf4dcbc83bbb32` includes finite streak feedback from `7c0832e` and preserves the concurrent hosted reminder quota fixes. Deployment `dpl_5qdLzxWPzArTU9Tm8Mvg1GHzZoai` is READY and confirmed on [production](https://timely-mauve-five.vercel.app). Served CSS verifies three finite flame/glow/spark cycles; hosted nonce/HSTS and auth/origin checks pass, with unsigned Inngest correctly rejected as 401. [Combined CI passes](https://github.com/Alexeiguch/timely/actions/runs/38445397815). No schema, secret, DNS or remote-push activation was performed in the animation task. [Complete evidence](progress.md#finite-streak-feedback--2026-10-13).
