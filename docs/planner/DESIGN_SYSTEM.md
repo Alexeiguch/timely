@@ -65,7 +65,7 @@ Use density adaptations thoughtfully on narrow screens, not arbitrary values eve
 
 **Forms:** visible labels, helper/error text, rounded fields and an inline readable summary of date/recurrence/reminder effects. Use progressive disclosure, but essential save behavior must remain obvious. Sheets on mobile respect the keyboard and safe area; dialogs on web trap/restore focus correctly.
 
-**Mobile sign-in:** show the compact brand and the prominent welcome heading **Make yourself at home.**, then available social options with Google first, followed by an “or” divider and the email field and primary action. Omit the divider when no social provider is available. Hide unconfigured providers; keep service-error recovery concise. After sending, replace the welcome heading with **Enter your code** and show one recipient line, the six-digit field, expiry and primary Sign in action. Resend and Change email are secondary text buttons that wrap for large text. Avoid repeated introductions and development configuration explanations. Keep code autofill, accessible labels and keyboard-aware scrolling.
+**Mobile sign-in:** show the prominent brand (56px wordmark and mark, per the owner’s 2026-10-13 request) and the welcome heading **Make yourself at home.**, then available social options with Google first, followed by an “or” divider and the email field and primary action. Omit the divider when no social provider is available. Hide unconfigured providers; keep service-error recovery concise. After sending, replace the welcome heading with **Enter your code** and show one recipient line, the six-digit field, expiry and primary Sign in action. Resend and Change email are secondary text buttons that wrap for large text. Avoid repeated introductions and development configuration explanations. Keep code autofill, accessible labels and keyboard-aware scrolling.
 
 **Progress group:** bold task title, a useful progress number, status legend, horizontal occurrence markers with date labels and an accessible equivalent list. Upcoming, completed, skipped and overdue markers remain distinguishable without color. Expose status and date to assistive technology.
 
@@ -85,7 +85,7 @@ Design widths: 320–430 px phone, 768 px tablet, and 1280–1440 px desktop. Su
 
 ## Motion and feedback
 
-Use small, purposeful animations for completion, card movement, sheet entry and mode changes. Target approximately 120–220 ms for common transitions. Respect reduced motion on each platform. Swipe-to-navigate must not conflict with horizontal occurrence scrolling or drag-to-move. Long press may start mobile dragging; scrolling remains easy. Every gesture has an explicit button/menu equivalent.
+Use small, purposeful animations for completion, card movement, sheet entry and mode changes. Target approximately 120–220 ms for common transitions. Respect reduced motion on each platform. Streak opt-in feedback pumps three times, then remains still; it does not loop continuously. Swipe-to-navigate must not conflict with horizontal occurrence scrolling or drag-to-move. Long press may start mobile dragging; scrolling remains easy. Every gesture has an explicit button/menu equivalent.
 
 ## Accessibility and visual acceptance
 

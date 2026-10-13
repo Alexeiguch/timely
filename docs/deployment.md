@@ -65,3 +65,8 @@ Source [3103e52](https://github.com/Alexeiguch/timely/commit/3103e52beb7c9c2655a
 ## Usability release — 2026-10-13
 
 Application `8151368` is READY on [production](https://timely-mauve-five.vercel.app), deployment `dpl_qkzGcc5YT6dm8PGwHv8ZaisiEfPP`. Migration 0006 was rehearsed and applied to the existing hosted planner with all prior table fingerprints preserved. The unmigrated checkpoint is `br-cool-dust-b4ygwtj6`, expires `2026-10-20T23:59:59Z`; the test rehearsal `br-rough-star-b4vft7cv` is not a recovery source. All 220 clean database tests, hosted auth/sync/boundary and desktop/phone CSP checks pass. [Release evidence and limitations](progress.md#authorized-usability-deployment--2026-10-13). Existing remote push remains disabled.
+
+
+## Larger login logo — 2026-10-13
+
+Source `cd86f9c48f33b5f3048dd81bd88322727fa392bb` is published to [production](https://timely-mauve-five.vercel.app), clean-archive deployment `dpl_BnDQFzu98EVMYxJGTRMhUFDZJjAP` ([immutable URL](https://timely-6zg01j3rr-alexeiguchs-projects.vercel.app)). The production alias, larger logo at desktop/320px, no horizontal overflow, fresh CSP/HSTS and authentication/origin boundaries are verified. [CI passes](https://github.com/Alexeiguch/timely/actions/runs/38441802968). No schema, environment, provider or DNS changes were needed for this visual update.

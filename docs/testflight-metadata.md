@@ -64,3 +64,10 @@ Archive: `/tmp/timely-testflight-20261013/Timely.xcarchive`; durable IPA/manifes
 English: Try the simpler task editor, repeat options, Search filters and reminder settings. Check that unfinished work and date ranges are clear. Save an edit offline and reconnect. Daily summaries are opt-in on this installation; check local delivery and cancellation on a physical device. Hosted remote notifications remain disabled.
 
 Spanish: Prueba el editor de tareas más sencillo, las opciones de repetición, los filtros de búsqueda y los ajustes de recordatorios. Comprueba que las tareas pendientes y los intervalos de fechas se entiendan. Guarda un cambio sin conexión y vuelve a conectarte. El resumen diario es opcional en esta instalación; comprueba la entrega local y la cancelación en un dispositivo físico. Las notificaciones remotas siguen desactivadas.
+
+
+## Larger login logo build 4 — 2026-10-13
+
+Apple accepted **0.1.0 (4)** from `cd86f9c48f33b5f3048dd81bd88322727fa392bb`; Xcode reported `Upload succeeded` and `EXPORT SUCCEEDED`. The login brand is now 56px, with wrapping for narrow layouts. Processing completion/Internal assignment remain unverified. Build 2 is still the last independently verified Internal build; no public review submission occurred.
+
+Archive/export/logs: `/tmp/timely-login-logo-ios-20261013/`; durable IPA/manifest: `.local/releases/2026-10-13/testflight-build-4/`. SHA-256: `49f40cc4d6c1a820b67954739dd7791ece940ead267fb5cbcd787310ae7f9e10`. Signature, identity, production entitlement/API and embedded bundle checks pass. Vendor-framework symbol warnings are nonfatal. EAS production counter is **4**; next unused build is **5**. Browser control was stopped before further Apple UI verification.

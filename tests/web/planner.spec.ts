@@ -54,6 +54,7 @@ test("friendly duration and weekdays survive reload, and month markers follow sw
   page,
   context,
 }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await signIn(context, `editor-proof-${randomUUID()}@example.test`);
   await page.goto("/?date=2026-10-09&mode=Day");
   await expect(page.getByRole("status")).toContainText("Synced");
@@ -82,6 +83,24 @@ test("friendly duration and weekdays survive reload, and month markers follow sw
   await expect(
     page.getByText("Keep your fire going.", { exact: true }),
   ).toBeVisible();
+  await expect
+    .poll(
+      () =>
+        page.locator(".streak-fire").evaluate((element) =>
+          [...element.querySelectorAll("*")]
+            .flatMap((child) => child.getAnimations())
+            .map((animation) => ({
+              state: animation.playState,
+              iterations: animation.effect?.getComputedTiming().iterations,
+            })),
+        ),
+      { timeout: 6000 },
+    )
+    .toEqual([
+      { state: "finished", iterations: 3 },
+      { state: "finished", iterations: 3 },
+      { state: "finished", iterations: 3 },
+    ]);
   await page.emulateMedia({ reducedMotion: "reduce" });
   expect(
     await page

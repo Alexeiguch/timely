@@ -23,6 +23,7 @@ export function StreakSetting({
 }) {
   useLanguage();
   const pulse = useRef(new Animated.Value(0)).current;
+  const hasPulsed = useRef(false);
   const [reduceMotion, setReduceMotion] = useState(true);
   const [active, setActive] = useState(AppState.currentState === "active");
   useEffect(() => {
@@ -49,7 +50,8 @@ export function StreakSetting({
   }, []);
   useEffect(() => {
     pulse.setValue(0);
-    if (!enabled || reduceMotion || !active) return;
+    if (!enabled) hasPulsed.current = false;
+    if (!enabled || reduceMotion || !active || hasPulsed.current) return;
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
@@ -65,8 +67,11 @@ export function StreakSetting({
           isInteraction: false,
         }),
       ]),
+      { iterations: 3 },
     );
-    animation.start();
+    animation.start(({ finished }) => {
+      if (finished) hasPulsed.current = true;
+    });
     return () => {
       animation.stop();
       pulse.setValue(0);
