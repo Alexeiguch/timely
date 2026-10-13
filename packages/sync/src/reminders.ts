@@ -4,9 +4,14 @@ import {
   projectSeries,
   reminderIdentity,
   today,
+  DailySummary,
   type ReminderPlan,
 } from "@timely/domain";
-import type { Occurrence, LocalCoverageEntry } from "@timely/contracts";
+import {
+  dailySummaryDefaults,
+  type Occurrence,
+  type LocalCoverageEntry,
+} from "@timely/contracts";
 import { reduceRecord } from "./records";
 import {
   visiblePreferences,
@@ -20,7 +25,11 @@ export interface ReminderCoverageAdapter {
   prepare(
     state: LocalState,
     entries: LocalCoverageEntry[],
-  ): Promise<{ available: boolean; blocked: string[] }>;
+  ): Promise<{
+    available: boolean;
+    blocked: string[];
+    summaryHandledDays?: string[];
+  }>;
   commit(
     state: LocalState,
     entries: LocalCoverageEntry[],
@@ -33,6 +42,7 @@ export type NativeReminder = {
   key: string;
   ownerId: string;
   due: number;
+  summaryCount?: number;
 };
 export interface NotificationAdapter {
   permission(): Promise<"granted" | "denied" | "undetermined">;
@@ -40,7 +50,7 @@ export interface NotificationAdapter {
   cancel(nativeId: string): Promise<void>;
   schedule(
     key: string,
-    item: Occurrence,
+    item: Occurrence | null,
     plan: ReminderPlan,
     ownerId: string,
   ): Promise<string>;
@@ -99,23 +109,63 @@ export class LocalReminderScheduler {
       day = today(zone, now),
       horizon = now + 7 * 86400000;
     const preferences = visiblePreferences(state);
-    const candidates = visibleRecords(state)
-      .records.flatMap((record) =>
-        projectSeries(
-          reduceRecord(record),
-          addDays(day, -8),
-          addDays(day, 15),
-        ).flatMap((item) =>
-          planReminders(item, preferences, zone, now).map((plan) => ({
-            item,
-            plan,
-            key: reminderIdentity(state.deviceId, plan),
-          })),
-        ),
+    const dailySummary = old.dailySummary ?? dailySummaryDefaults;
+    const summaryHandled = { ...old.summaryHandled };
+    // An elapsed OS-owned summary consumes this date even after a time/zone change.
+    for (const mapping of Object.values(old.mappings))
+      if (mapping.kind === "summary" && mapping.due <= now)
+        summaryHandled[mapping.day] = mapping.due;
+    for (const [day, due] of Object.entries(summaryHandled))
+      if (due < now - 8 * 86400000) delete summaryHandled[day];
+    const records = visibleRecords(state).records;
+    const tasks = records.flatMap((record) =>
+      projectSeries(
+        reduceRecord(record),
+        addDays(day, -8),
+        addDays(day, 15),
+      ).flatMap((item) =>
+        planReminders(item, preferences, zone, now).map((plan) => ({
+          item,
+          day: item.schedule.date,
+          plan,
+          key: reminderIdentity(state.deviceId, plan),
+        })),
+      ),
+    );
+    const summaries = DailySummary.plans(
+      records.map(reduceRecord),
+      dailySummary,
+      zone,
+      now,
+    ).map((plan) => ({
+      item: null,
+      day: plan.day,
+      plan,
+      key: reminderIdentity(state.deviceId, plan),
+    }));
+    const candidates = [...tasks, ...summaries]
+      .filter(
+        ({ plan, key, day }) =>
+          plan.due <= horizon &&
+          !old.handled[key] &&
+          !(plan.kind === "summary" && summaryHandled[day]),
       )
-      .filter(({ plan, key }) => plan.due <= horizon && !old.handled[key])
       .sort((a, b) => a.plan.due - b.plan.due || a.key.localeCompare(b.key));
-    let wanted = permission === "granted" ? candidates.slice(0, 48) : [];
+    // Keep the gentle daily nudge covered even when many explicit task alarms fill the OS budget.
+    const summarySlots = candidates.filter(
+      (entry) => entry.plan.kind === "summary",
+    );
+    let wanted =
+      permission === "granted"
+        ? [
+            ...summarySlots,
+            ...candidates
+              .filter((entry) => entry.plan.kind !== "summary")
+              .slice(0, 48 - summarySlots.length),
+          ].sort(
+            (a, b) => a.plan.due - b.plan.due || a.key.localeCompare(b.key),
+          )
+        : [];
     const remoteOwned = { ...old.remoteOwned };
     for (const [key, due] of Object.entries(remoteOwned))
       if (due < now - 8 * 86400000) delete remoteOwned[key];
@@ -128,14 +178,16 @@ export class LocalReminderScheduler {
           state,
           wanted.map(({ key, item, plan }) => ({
             key,
-            occurrenceId: item.id,
+            occurrenceId: plan.occurrenceId,
             kind: plan.kind,
             version: plan.version,
             due: plan.due,
-            day: item.schedule.date,
+            day: plan.kind === "summary" ? plan.day : item!.schedule.date,
           })),
         );
         available = prepared.available;
+        for (const day of prepared.summaryHandledDays ?? [])
+          summaryHandled[day] = now;
         remoteStatus = available ? "paused" : "not-configured";
         for (const key of prepared.blocked) {
           const entry = wanted.find((entry) => entry.key === key);
@@ -146,29 +198,54 @@ export class LocalReminderScheduler {
         // Offline, keep established local ownership. A server-owned canonical plan must not acquire a competing OS schedule.
         if (old.remoteReady) {
           const canonical = { ...state, outbox: [] };
+          const serverCandidates = remoteReminderCandidates(
+            visibleRecords(canonical).records,
+            visiblePreferences(canonical),
+            state.deviceId,
+            zone,
+            now,
+            old.remoteSummaryPolicy ?? dailySummaryDefaults,
+          );
           const serverKeys = new Set(
-            remoteReminderCandidates(
-              visibleRecords(canonical).records,
-              visiblePreferences(canonical),
-              state.deviceId,
-              zone,
-              now,
-            ).map((entry) => entry.key),
+            serverCandidates.map((entry) => entry.key),
+          );
+          const serverSummaryDays = new Set(
+            serverCandidates
+              .filter((entry) => entry.plan.kind === "summary")
+              .map((entry) => entry.day),
           );
           wanted = wanted.filter(
-            (entry) => !!old.mappings[entry.key] || !serverKeys.has(entry.key),
+            (entry) =>
+              !!old.mappings[entry.key] ||
+              (entry.plan.kind === "summary"
+                ? !serverSummaryDays.has(entry.day) ||
+                  Object.values(old.mappings).some(
+                    (mapping) =>
+                      mapping.kind === "summary" && mapping.day === entry.day,
+                  )
+                : !serverKeys.has(entry.key)),
           );
         }
       }
     }
-    wanted = wanted.filter((entry) => !remoteOwned[entry.key]);
+    wanted = wanted.filter(
+      (entry) =>
+        !remoteOwned[entry.key] &&
+        !(entry.plan.kind === "summary" && summaryHandled[entry.day]),
+    );
     const desired = new Map(wanted.map((entry) => [entry.key, entry]));
     const actual = (await this.adapter.scheduled()).filter(
       (entry) => entry.ownerId === state.ownerId,
     );
     const existing = new Map<string, NativeReminder>();
     for (const entry of actual) {
-      if (!desired.has(entry.key) || existing.has(entry.key))
+      const target = desired.get(entry.key);
+      if (
+        !desired.has(entry.key) ||
+        existing.has(entry.key) ||
+        (target?.plan.kind === "summary" &&
+          entry.summaryCount !== target.plan.count)
+      )
         await this.adapter.cancel(entry.nativeId);
       else existing.set(entry.key, entry);
     }
@@ -185,11 +262,11 @@ export class LocalReminderScheduler {
         (await this.adapter.schedule(key, item, plan, state.ownerId));
       mappings[key] = {
         nativeId,
-        occurrenceId: item.id,
+        occurrenceId: plan.occurrenceId,
         kind: plan.kind,
         version: plan.version,
         due: plan.due,
-        day: item.schedule.date,
+        day: plan.kind === "summary" ? plan.day : item!.schedule.date,
       };
     }
     // Retain elapsed dedupe identities beyond the allowed one-hour late window.
@@ -200,16 +277,29 @@ export class LocalReminderScheduler {
         current.cursor !== state.cursor ||
         current.clock.physical !== state.clock.physical ||
         current.clock.logical !== state.clock.logical ||
+        JSON.stringify(
+          current.reminders?.dailySummary ?? dailySummaryDefaults,
+        ) !== JSON.stringify(dailySummary) ||
         current.outbox.map((pending) => pending.operation.id).join() !==
           state.outbox.map((pending) => pending.operation.id).join();
       current.reminders = {
         retry: changed,
         permission,
+        dailySummary: current.reminders?.dailySummary ?? dailySummary,
+        summaryHandled: {
+          ...current.reminders?.summaryHandled,
+          ...summaryHandled,
+        },
         mappings,
         handled,
         scheduled: Object.keys(mappings).length,
         ...(this.coverage
-          ? { remoteOwned, remoteReady: old.remoteReady ?? false, remoteStatus }
+          ? {
+              remoteOwned,
+              remoteReady: old.remoteReady ?? false,
+              remoteStatus,
+              remoteSummaryPolicy: old.remoteSummaryPolicy,
+            }
           : {}),
         uncovered:
           permission === "granted"
@@ -243,6 +333,9 @@ export class LocalReminderScheduler {
           await this.store.transaction((state) => {
             if (state.reminders) {
               state.reminders.remoteReady = result.ready;
+              if (result.ready)
+                state.reminders.remoteSummaryPolicy =
+                  current.reminders?.dailySummary ?? dailySummaryDefaults;
               state.reminders.remoteStatus = result.ready ? "ready" : "paused";
               state.reminders.retry ||= result.retry;
             }

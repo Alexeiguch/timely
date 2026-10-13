@@ -7,8 +7,9 @@ import {
   SkipForward,
   ArrowRight,
   Trash2,
+  Repeat2,
 } from "lucide-react";
-import { addDays, status, type Streak } from "@timely/domain";
+import { formatCivilDate, addDays, status, type Streak } from "@timely/domain";
 import type { Occurrence } from "@timely/contracts";
 import { StreakIndicator } from "./streak-indicator";
 type Props = {
@@ -18,6 +19,7 @@ type Props = {
   now: number;
   currentDay: string;
   reviewing: boolean;
+  recurring: boolean;
   action: (work: () => Promise<unknown>) => Promise<void>;
   transition: (item: Occurrence, value: Occurrence["state"]) => Promise<void>;
   move: (item: Occurrence, day: string) => Promise<void>;
@@ -33,6 +35,7 @@ export function PlannerTaskCard({
   now,
   currentDay,
   reviewing,
+  recurring,
   action,
   transition,
   move,
@@ -57,7 +60,10 @@ export function PlannerTaskCard({
         className="complete-button"
         role="checkbox"
         aria-checked={item.state === "completed"}
-        aria-label={t("Complete {v0}", { v0: item.title })}
+        aria-label={t(
+          item.state === "completed" ? "Reopen {v0}" : "Complete {v0}",
+          { v0: item.title },
+        )}
         onClick={() =>
           void action(() =>
             transition(
@@ -75,7 +81,15 @@ export function PlannerTaskCard({
       </button>
       <div className="task-content">
         <div className="task-meta">
-          {reviewing && <span>{item.schedule.date}</span>}
+          {reviewing && (
+            <span>
+              {formatCivilDate(
+                item.schedule.date,
+                { day: "numeric", month: "short", year: "numeric" },
+                locale(),
+              )}
+            </span>
+          )}
           {item.originalDate !== item.schedule.date && (
             <span>{t("Moved from {v0}", { v0: item.originalDate })}</span>
           )}
@@ -93,6 +107,12 @@ export function PlannerTaskCard({
               ? t(" \u00B7 {v0} min", { v0: item.schedule.duration })
               : ""}
           </span>
+          {recurring && (
+            <span className="recurring-hint">
+              <Repeat2 size={14} aria-hidden="true" />
+              {t("Repeats")}
+            </span>
+          )}
           {item.priority && (
             <span className={`priority ${item.priority}`}>
               {t("{v0} priority", { v0: t(item.priority) })}
@@ -114,70 +134,78 @@ export function PlannerTaskCard({
             <Pencil size={15} />
             {t("Edit")}
           </button>
-          {(!item.streak || item.state === "skipped") && (
-            <button
-              onClick={() =>
-                void action(() =>
-                  transition(
-                    item,
-                    item.state === "skipped" ? "pending" : "skipped",
-                  ),
-                )
-              }
-            >
-              {item.state === "skipped" ? (
-                <RotateCcw size={15} />
-              ) : (
-                <SkipForward size={15} />
-              )}{" "}
-              {item.state === "skipped" ? t("Unskip") : t("Skip")}
-            </button>
-          )}
-          <button
-            onClick={() =>
-              void action(() =>
-                move(
-                  item,
-                  item.schedule.date === currentDay
-                    ? addDays(currentDay, 1)
-                    : currentDay,
-                ),
-              )
-            }
-          >
-            <ArrowRight size={15} />{" "}
-            {item.schedule.date === currentDay ? t("Tomorrow") : t("Today")}
-          </button>
-          <button
-            aria-label={t("Move {v0} to a date", { v0: item.title })}
-            onClick={() => {
-              chooseMove(item);
-            }}
-          >
-            {t("Move\u2026")}
-          </button>
-          {item.state === "pending" &&
-            item.schedule.time === null &&
-            ([-1, 1] as const).map((direction) => (
+          <details className="task-more">
+            <summary aria-label={t("Actions for {v0}", { v0: item.title })}>
+              {t("More actions")}
+            </summary>
+            <div className="task-more-actions">
+              {(!item.streak || item.state === "skipped") && (
+                <button
+                  onClick={() =>
+                    void action(() =>
+                      transition(
+                        item,
+                        item.state === "skipped" ? "pending" : "skipped",
+                      ),
+                    )
+                  }
+                >
+                  {item.state === "skipped" ? (
+                    <RotateCcw size={15} />
+                  ) : (
+                    <SkipForward size={15} />
+                  )}{" "}
+                  {item.state === "skipped" ? t("Unskip") : t("Skip")}
+                </button>
+              )}
               <button
-                key={direction}
-                aria-label={t("Move {v0} {v1}", {
-                  v0: item.title,
-                  v1: direction < 0 ? t("up") : t("down"),
-                })}
-                onClick={() => void reorder(item, direction)}
+                onClick={() =>
+                  void action(() =>
+                    move(
+                      item,
+                      item.schedule.date === currentDay
+                        ? addDays(currentDay, 1)
+                        : currentDay,
+                    ),
+                  )
+                }
               >
-                {direction < 0 ? t("\u2191 Up") : t("\u2193 Down")}
+                <ArrowRight size={15} />{" "}
+                {item.schedule.date === currentDay ? t("Tomorrow") : t("Today")}
               </button>
-            ))}
-          <button
-            aria-label={t("Delete {v0}", { v0: item.title })}
-            onClick={() => {
-              chooseDelete(item);
-            }}
-          >
-            <Trash2 size={15} />
-          </button>
+              <button
+                aria-label={t("Move {v0} to a date", { v0: item.title })}
+                onClick={() => {
+                  chooseMove(item);
+                }}
+              >
+                {t("Move\u2026")}
+              </button>
+              {item.state === "pending" &&
+                item.schedule.time === null &&
+                ([-1, 1] as const).map((direction) => (
+                  <button
+                    key={direction}
+                    aria-label={t("Move {v0} {v1}", {
+                      v0: item.title,
+                      v1: direction < 0 ? t("up") : t("down"),
+                    })}
+                    onClick={() => void reorder(item, direction)}
+                  >
+                    {direction < 0 ? t("\u2191 Up") : t("\u2193 Down")}
+                  </button>
+                ))}
+              <button
+                aria-label={t("Delete {v0}", { v0: item.title })}
+                onClick={() => {
+                  chooseDelete(item);
+                }}
+              >
+                <Trash2 size={15} />
+                {t("Delete")}
+              </button>
+            </div>
+          </details>
         </div>
       </div>
     </article>

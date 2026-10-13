@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { t, locale } from "@timely/i18n";
 import { RotateCcw, Undo2, LogOut, Trash2 } from "lucide-react";
 import { LanguageChoice } from "./language";
@@ -27,6 +28,7 @@ export function PlannerSettings({
   onSignOut,
 }: Props) {
   useLanguage();
+  const [remindersSaved, setRemindersSaved] = useState(false);
   const { grouped, firstWeekday } = planner.preferences;
   return (
     <section className="settings-card">
@@ -75,79 +77,94 @@ export function PlannerSettings({
       <h2>{t("Reminder defaults")}</h2>
       <p>
         {t(
+          "For one gentle daily summary, open Reminders in the mobile app's Settings. Each device has its own time and off switch.",
+        )}
+      </p>
+      <p>
+        {t(
           "These choices sync to mobile. This browser shows in-app overdue cues; system reminders are scheduled on mobile.",
         )}
       </p>
-      <form
-        className="reminder-settings"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const data = new FormData(event.currentTarget);
-          void action(() =>
-            planner.setPreferences({
-              reminders: {
-                before: data.has("before"),
-                overdue: data.has("overdue"),
-                beforeMinutes: Number(data.get("beforeMinutes")),
-                overdueMinutes: Number(data.get("overdueMinutes")),
-                morning: String(data.get("morning")),
-              },
-            }),
-          );
-        }}
-        key={JSON.stringify(planner.preferences)}
-      >
-        <div className="reminder-checkbox-row">
-          <input
-            id="reminder-before"
-            name="before"
-            type="checkbox"
-            defaultChecked={planner.preferences.before}
-          />
-          <label htmlFor="reminder-before">{t("Before a task")}</label>
+      <details className="disclosure">
+        <summary>{t("Task reminder defaults")}</summary>
+        <div className="disclosure-content">
+          <form
+            className="reminder-settings"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const data = new FormData(event.currentTarget);
+              setRemindersSaved(false);
+              void action(async () => {
+                await planner.setPreferences({
+                  reminders: {
+                    before: data.has("before"),
+                    overdue: data.has("overdue"),
+                    beforeMinutes: Number(data.get("beforeMinutes")),
+                    overdueMinutes: Number(data.get("overdueMinutes")),
+                    morning: String(data.get("morning")),
+                  },
+                });
+                setRemindersSaved(true);
+              });
+            }}
+            key={JSON.stringify(planner.preferences)}
+          >
+            <div className="reminder-checkbox-row">
+              <input
+                id="reminder-before"
+                name="before"
+                type="checkbox"
+                defaultChecked={planner.preferences.before}
+              />
+              <label htmlFor="reminder-before">{t("Before a task")}</label>
+            </div>
+            <div className="reminder-checkbox-row">
+              <input
+                id="reminder-overdue"
+                name="overdue"
+                type="checkbox"
+                defaultChecked={planner.preferences.overdue}
+              />
+              <label htmlFor="reminder-overdue">{t("When overdue")}</label>
+            </div>
+            <label>
+              {t("Minutes before a timed task")}
+              <input
+                name="beforeMinutes"
+                type="number"
+                min="0"
+                max="10080"
+                required
+                defaultValue={planner.preferences.beforeMinutes}
+              />
+            </label>
+            <label>
+              {t("Minutes after a timed task is due")}
+              <input
+                name="overdueMinutes"
+                type="number"
+                min="0"
+                max="10080"
+                required
+                defaultValue={planner.preferences.overdueMinutes}
+              />
+            </label>
+            <label>
+              {t("Untimed morning reminder")}
+              <input
+                name="morning"
+                type="time"
+                required
+                defaultValue={planner.preferences.morning}
+              />
+            </label>
+            <button type="submit">{t("Save reminder defaults")}</button>
+          </form>
+          {remindersSaved && (
+            <p role="status">{t("Reminder defaults saved on this device.")}</p>
+          )}
         </div>
-        <div className="reminder-checkbox-row">
-          <input
-            id="reminder-overdue"
-            name="overdue"
-            type="checkbox"
-            defaultChecked={planner.preferences.overdue}
-          />
-          <label htmlFor="reminder-overdue">{t("When overdue")}</label>
-        </div>
-        <label>
-          {t("Minutes before a timed task")}
-          <input
-            name="beforeMinutes"
-            type="number"
-            min="0"
-            max="10080"
-            required
-            defaultValue={planner.preferences.beforeMinutes}
-          />
-        </label>
-        <label>
-          {t("Minutes after a timed task is due")}
-          <input
-            name="overdueMinutes"
-            type="number"
-            min="0"
-            max="10080"
-            required
-            defaultValue={planner.preferences.overdueMinutes}
-          />
-        </label>
-        <label>
-          {t("Untimed morning reminder")}
-          <input
-            name="morning"
-            type="time"
-            required
-            defaultValue={planner.preferences.morning}
-          />
-        </label>
-        <button type="submit">{t("Save reminder defaults")}</button>
-      </form>
+      </details>
       <h2>{t("Your account")}</h2>
       <p>{email}</p>
       <dl>
@@ -168,16 +185,18 @@ export function PlannerSettings({
         </p>
       )}
       <div className="account-actions">
-        <button
-          type="button"
-          className="account-action"
-          onClick={() => void action(() => planner.retry())}
-        >
-          <span className="account-action-mark" aria-hidden="true">
-            <RotateCcw size={18} strokeWidth={2.25} />
-          </span>
-          <span>{t("Retry saved changes")}</span>
-        </button>
+        {!!planner.state?.outbox.length && (
+          <button
+            type="button"
+            className="account-action"
+            onClick={() => void action(() => planner.retry())}
+          >
+            <span className="account-action-mark" aria-hidden="true">
+              <RotateCcw size={18} strokeWidth={2.25} />
+            </span>
+            <span>{t("Retry saved changes")}</span>
+          </button>
+        )}
         {Array.from(
           new Set(
             planner.state?.outbox
@@ -220,18 +239,26 @@ export function PlannerSettings({
           </button>
         )}
       </div>
-      <div className="account-danger">
-        <button
-          type="button"
-          className="account-action danger"
-          onClick={() => onDeleteAccount()}
-        >
-          <span className="account-action-mark" aria-hidden="true">
-            <Trash2 size={18} strokeWidth={2.25} />
-          </span>
-          <span>{t("Delete account")}</span>
-        </button>
-      </div>
+      <details className="disclosure">
+        <summary>{t("Manage account")}</summary>
+        <p>
+          {t(
+            "Deleting your account permanently removes your plans and history from every device.",
+          )}
+        </p>
+        <div className="account-danger">
+          <button
+            type="button"
+            className="account-action danger"
+            onClick={() => onDeleteAccount()}
+          >
+            <span className="account-action-mark" aria-hidden="true">
+              <Trash2 size={18} strokeWidth={2.25} />
+            </span>
+            <span>{t("Delete account")}</span>
+          </button>
+        </div>
+      </details>
     </section>
   );
 }

@@ -102,3 +102,4 @@ export * from "./remote-reminders";
 export * from "./local-state";
 
 export * from "./streaks";
+export * from "./notification-settings";

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ServerDiagnostics } from "./diagnostics";
 import { notificationRepository } from "@timely/db/notifications";
 import { reminderBody } from "@timely/sync";
+import { DailySummary } from "@timely/domain";
 import { translate, parseLanguage } from "@timely/i18n";
 import { expoPush, pushConfiguration } from "./expo-push";
 export async function runPushWorker(
@@ -49,18 +50,30 @@ export async function runPushWorker(
         if (!claimed?.push.token) continue;
         dispatches++;
         const language = parseLanguage(claimed.push.language);
-        const body = claimed.item
-          ? reminderBody(claimed.item, job.kind as "before" | "overdue")
-          : { message: "Your remote notification test arrived." };
+        const summary = job.kind === "summary";
+        if (
+          summary &&
+          (!Number.isSafeInteger(claimed.summaryCount) ||
+            (claimed.summaryCount ?? 0) < 1)
+        )
+          throw new Error("InvalidSummaryCount");
+        const body = summary
+          ? DailySummary.message(claimed.summaryCount ?? 0)
+          : claimed.item
+            ? reminderBody(claimed.item, job.kind as "before" | "overdue")
+            : { message: "Your remote notification test arrived." };
         dispatched = true;
         const result = await provider.send({
           to: claimed.push.token,
           title:
-            claimed.item?.title ??
+            (summary
+              ? translate("Timely · Your daily summary", {}, language)
+              : claimed.item?.title) ??
             translate("Timely · Push notification test", {}, language),
           body: translate(body.message, body.parameters, language),
           expiration: Math.floor(job.expires / 1000),
           collapseId: job.key,
+          silent: summary,
           data: {
             environment: claimed.push.environment,
             ownerId: job.ownerId,
@@ -69,6 +82,7 @@ export async function runPushWorker(
             kind: job.kind,
             version: job.version,
             key: job.key,
+            ...(summary ? { summaryCount: claimed.summaryCount } : {}),
           },
         });
         const retry =

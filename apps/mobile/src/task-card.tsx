@@ -121,7 +121,12 @@ export function TaskCard({
         </Pressable>
       </View>
       <View style={s.row}>
-        {recurring && <Repeat2 size={18} color={colors.muted} />}
+        {recurring && (
+          <View style={s.row}>
+            <Repeat2 size={18} color={colors.muted} />
+            <Text style={s.muted}>{t("Repeats")}</Text>
+          </View>
+        )}
         {item.priority && (
           <Text style={[s.label, styles.priority]}>
             {t("{v0} priority", { v0: t(item.priority) })}

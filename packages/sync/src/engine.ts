@@ -10,6 +10,7 @@ import {
   type Command,
   type Operation,
   type TaskRecord,
+  type DailySummaryPolicy,
 } from "@timely/contracts";
 import {
   appendSyncOperation,
@@ -44,12 +45,15 @@ export type LocalState = {
   reminders?: {
     retry: boolean;
     permission: "granted" | "denied" | "undetermined";
+    dailySummary?: DailySummaryPolicy;
+    remoteSummaryPolicy?: DailySummaryPolicy;
+    summaryHandled?: Record<string, number>;
     mappings: Record<
       string,
       {
         nativeId: string;
         occurrenceId: string;
-        kind: "before" | "overdue";
+        kind: "before" | "overdue" | "summary";
         version: string;
         due: number;
         day: string;

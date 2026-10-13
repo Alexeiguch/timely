@@ -1470,3 +1470,74 @@ a {
 .language-choice button[aria-pressed="true"] { background: var(--blue, #1A5FCF); color: white; }
 
 .signin > .language-choice { grid-column: 1 / -1; justify-self: end; margin: 0; }
+
+/* Optional controls stay secondary; task creation keeps Save in view. */
+.editor:not(.action-dialog) {
+  overflow: hidden;
+}
+.editor:not(.action-dialog) form {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(90dvh - 64px);
+  min-height: 0;
+}
+.editor-body {
+  display: grid;
+  gap: 20px;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 8px;
+}
+.editor-details, .disclosure-content {
+  display: grid;
+  gap: 16px;
+}
+.editor-footer {
+  flex-shrink: 0;
+  padding-top: 16px;
+  border-top: 1px solid #ced5df;
+}
+.disclosure > summary, .task-more > summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 12px 8px;
+  color: var(--primary);
+  font-weight: 700;
+}
+.disclosure > summary:focus-visible, .task-more > summary:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+.disclosure-content { padding-top: 12px; }
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+}
+.checkbox-label input { width: 20px; min-height: 20px; }
+.task-more-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+}
+.task-more { min-width: 0; }
+.task-more-actions button { min-height: 44px; }
+.recurring-hint { display: inline-flex; align-items: center; gap: 4px; }
+@media (max-width: 600px) {
+  .editor:not(.action-dialog) form { max-height: calc(90dvh - 40px); }
+}
+
+.task-more > summary {
+  font: 700 13px / 1.5 "Nunito Sans", sans-serif;
+}
+.history-filters > .form-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 767px) {
+  .history-filters > .form-grid { grid-template-columns: 1fr; }
+}

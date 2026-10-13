@@ -52,6 +52,30 @@ beforeEach(() => {
   vi.stubEnv("EXPO_PUSH_PROJECT_ID", randomUUID());
 });
 afterEach(() => vi.unstubAllEnvs());
+it("sends one quiet localized summary with counts and no authored content", async () => {
+  const f = fixture();
+  f.job.kind = "summary";
+  f.repo.claim.mockImplementation(async () => ({
+    job: f.job,
+    item: null,
+    summaryCount: 3,
+    push: {
+      token: "ExpoPushToken[synthetic-worker]",
+      language: "es",
+      environment: "https://staging.example.test",
+    },
+  }));
+  await f.run();
+  expect(f.provider.send).toHaveBeenCalledTimes(1);
+  expect(f.provider.send).toHaveBeenCalledWith(
+    expect.objectContaining({
+      title: "Timely · Tu resumen diario",
+      body: "Te quedan 3 planes de hoy. Elige un pequeño paso.",
+      silent: true,
+      data: expect.objectContaining({ kind: "summary", summaryCount: 3 }),
+    }),
+  );
+});
 it("rechecks canonical claims before sending and does not leak content in worker results", async () => {
   const f = fixture();
   f.repo.claim.mockResolvedValue(null);

@@ -77,18 +77,27 @@ export function progress(
     ratio: eligible.length ? completed / eligible.length : null,
   };
 }
-export type ReminderPlan = {
+export type TaskReminderPlan = {
   occurrenceId: string;
   kind: "before" | "overdue";
   due: number;
   version: string;
 };
+export type DailySummaryPlan = {
+  occurrenceId: string;
+  kind: "summary";
+  due: number;
+  version: string;
+  day: string;
+  count: number;
+};
+export type ReminderPlan = TaskReminderPlan | DailySummaryPlan;
 export function planReminders(
   occurrence: Occurrence,
   preferences: Preferences,
   zone: string,
   now: number,
-): ReminderPlan[] {
+): TaskReminderPlan[] {
   if (
     occurrence.deleted ||
     occurrence.state !== "pending" ||
@@ -112,7 +121,7 @@ export function planReminders(
     start === null
       ? instant(addDays(occurrence.schedule.date, 1), preferences.morning, zone)
       : due + preferences.overdueMinutes * 60000;
-  const plans: ReminderPlan[] = [];
+  const plans: TaskReminderPlan[] = [];
   if (occurrence.reminders.before && preferences.before && before > now)
     plans.push({
       occurrenceId: occurrence.id,

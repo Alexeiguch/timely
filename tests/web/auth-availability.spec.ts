@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
-test.beforeEach(async ({ context }) => { await context.addInitScript(() => localStorage.setItem("timely-language", "en")); });
+test.beforeEach(async ({ context }) => {
+  await context.addInitScript(() =>
+    localStorage.setItem("timely-language", "en"),
+  );
+});
 
 test("serves browser icons and advertises only configured social providers", async ({
   page,
@@ -36,14 +40,12 @@ test("serves browser icons and advertises only configured social providers", asy
       name: `Continue with ${provider === "google" ? "Google" : "Apple"}`,
     });
     if (providers[provider]) await expect(button).toBeEnabled();
-    else await expect(button).toBeDisabled();
+    else await expect(button).toHaveCount(0);
   }
   if (!providers.google && !providers.apple)
     await expect(
-      page.getByText(
-        "Google and Apple sign-in is not available here yet. Use your email to sign in.",
-      ),
-    ).toBeVisible();
+      page.getByText("or use your email", { exact: true }),
+    ).toHaveCount(0);
   expect(socialRequests).toEqual([]);
   const icons = await page
     .locator('link[rel="icon"]')
@@ -86,10 +88,10 @@ test("keeps email usable when availability lookup fails and recovers on retry", 
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Continue with Google" }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Continue with Apple" }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Send me a code" }),
   ).toBeEnabled();

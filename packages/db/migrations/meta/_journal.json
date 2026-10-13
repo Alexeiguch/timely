@@ -43,6 +43,13 @@
       "when": 1791811816856,
       "tag": "0005_aberrant_masque",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791843536709,
+      "tag": "0006_minor_archangel",
+      "breakpoints": true
     }
   ]
 }

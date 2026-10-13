@@ -3,12 +3,19 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { getLanguage } from "@timely/i18n";
 import {
+  dailySummaryDefaults,
+  notificationPreparationResponseSchema,
+} from "@timely/contracts";
+import {
   httpTransport,
   type ReminderCoverageAdapter,
   type LocalState,
 } from "@timely/sync";
 import { apiURL, authenticatedFetch } from "./auth";
-import { notificationPermission } from "./notifications";
+import {
+  notificationPermission,
+  configureSummaryChannel,
+} from "./notifications";
 class PushRequests {
   static async bounded<T>(work: Promise<T>, timeoutMs = 8000): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -53,6 +60,8 @@ export function createPushCoverage(): ReminderCoverageAdapter {
     )(path, body);
   return {
     async prepare(state, entries) {
+      if (state.reminders?.dailySummary?.enabled)
+        await configureSummaryChannel();
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8000);
       const response = await fetch(`${apiURL}/api/v1/notifications/config`, {
@@ -99,17 +108,24 @@ export function createPushCoverage(): ReminderCoverageAdapter {
         zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         protocolVersion: 1,
       });
-      const result = (await request(state, "notifications/prepare", {
-        deviceId: state.deviceId,
-        projectId,
-        token,
-        platform: Platform.OS,
-        zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        language: getLanguage(),
-        permission,
-        keys: entries.map((entry) => entry.key),
-      })) as { blocked: string[] };
-      return { available: true, blocked: result.blocked };
+      const result = notificationPreparationResponseSchema.parse(
+        await request(state, "notifications/prepare", {
+          deviceId: state.deviceId,
+          projectId,
+          token,
+          platform: Platform.OS,
+          zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          language: getLanguage(),
+          permission,
+          dailySummary: state.reminders?.dailySummary ?? dailySummaryDefaults,
+          keys: entries.map((entry) => entry.key),
+        }),
+      );
+      return {
+        available: true,
+        blocked: result.blocked,
+        summaryHandledDays: result.summaryHandledDays,
+      };
     },
     async commit(state, entries, handled) {
       return (await request(state, "notifications/coverage", {

@@ -64,68 +64,91 @@ export function PlannerHistoryFilters({
             onChange={(event) => setHistoryThrough(event.target.value)}
           />
         </label>
-        <label>
-          {t("Task status")}
-          <select
-            aria-label={t("Task status")}
-            value={historyState}
-            onChange={(event) => setHistoryState(event.target.value)}
-          >
-            {["all", "overdue", "pending", "completed", "skipped"].map(
-              (value) => (
+      </div>
+      <details className="disclosure">
+        <summary>
+          {t("Filter plans")}
+          {historyState !== "all" && ` · ${t(historyState)}`}
+          {historyPriority !== "all" && ` · ${t(historyPriority)}`}
+          {historyDefinition && ` · ${t("Repeating task")}`}
+        </summary>
+        <div className="form-grid disclosure-content">
+          <label>
+            {t("Task status")}
+            <select
+              aria-label={t("Task status")}
+              value={historyState}
+              onChange={(event) => setHistoryState(event.target.value)}
+            >
+              {["all", "overdue", "pending", "completed", "skipped"].map(
+                (value) => (
+                  <option key={value} value={value}>
+                    {value === "pending" ? t("Unfinished") : t(value)}
+                  </option>
+                ),
+              )}
+            </select>
+          </label>
+          <label>
+            {t("Priority filter")}
+            <select
+              aria-label={t("Priority filter")}
+              value={historyPriority}
+              onChange={(event) => setHistoryPriority(event.target.value)}
+            >
+              {["all", "none", "low", "medium", "high"].map((value) => (
                 <option key={value} value={value}>
                   {t(value)}
                 </option>
-              ),
-            )}
-          </select>
-        </label>
-        <label>
-          {t("Priority filter")}
-          <select
-            aria-label={t("Priority filter")}
-            value={historyPriority}
-            onChange={(event) => setHistoryPriority(event.target.value)}
-          >
-            {["all", "none", "low", "medium", "high"].map((value) => (
-              <option key={value} value={value}>
-                {t(value)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          {t("Series filter")}
-          <select
-            aria-label={t("Series filter")}
-            value={historyDefinition ?? "all"}
-            onChange={(event) =>
-              setHistoryDefinition(
-                event.target.value === "all" ? undefined : event.target.value,
-              )
-            }
-          >
-            <option value="all">{t("All plans")}</option>
-            {records
-              .filter((record) =>
-                reduceRecord(record).revisions.some(
-                  (revision) => revision.task.rule,
-                ),
-              )
-              .map((record) => (
-                <option key={record.id} value={record.id}>
-                  {reduceRecord(record).revisions.at(-1)!.task.title}
-                </option>
               ))}
-          </select>
-        </label>
-      </div>
+            </select>
+          </label>
+          <label>
+            {t("Series filter")}
+            <select
+              aria-label={t("Series filter")}
+              value={historyDefinition ?? "all"}
+              onChange={(event) =>
+                setHistoryDefinition(
+                  event.target.value === "all" ? undefined : event.target.value,
+                )
+              }
+            >
+              <option value="all">{t("All plans")}</option>
+              {records
+                .filter((record) =>
+                  reduceRecord(record).revisions.some(
+                    (revision) => revision.task.rule,
+                  ),
+                )
+                .map((record) => (
+                  <option key={record.id} value={record.id}>
+                    {reduceRecord(record).revisions.at(-1)!.task.title}
+                  </option>
+                ))}
+            </select>
+          </label>
+        </div>
+      </details>
+      {(historyState !== "all" ||
+        historyPriority !== "all" ||
+        historyDefinition) && (
+        <button
+          onClick={() => {
+            setHistoryState("all");
+            setHistoryPriority("all");
+            setHistoryDefinition(undefined);
+          }}
+        >
+          {t("Clear filters")}
+        </button>
+      )}
       {historyError && <p role="alert">{errorMessage(historyError)}</p>}
       <p className="muted">
         {onlineSnapshot
-          ? t("Online snapshot for this range")
+          ? t("Showing online history for this range")
           : t(
-              "Downloaded plans are available offline. Load online history to check a fixed server snapshot.",
+              "Saved plans are available offline. Check online history for older plans from your account.",
             )}
       </p>
       <button

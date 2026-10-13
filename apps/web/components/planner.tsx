@@ -273,7 +273,8 @@ export function Planner({
     );
   const totals = progress(all, zone, now);
   const elapsed = progress(all, zone, now, true);
-  const blank = (): Task => newTask(crypto.randomUUID(), selected);
+  const blank = (day = tab === "Planner" ? selected : currentDay): Task =>
+    newTask(crypto.randomUUID(), day);
   async function action(work: () => Promise<unknown>) {
     try {
       await work();
@@ -436,6 +437,13 @@ export function Planner({
       now={now}
       currentDay={currentDay}
       reviewing={reviewing}
+      recurring={planner.records.some(
+        (record) =>
+          record.id === item.definitionId &&
+          !!reduceRecord(record).revisions.find(
+            (revision) => revision.id === item.revisionId,
+          )?.task.rule,
+      )}
       action={action}
       transition={transition}
       move={move}
@@ -455,15 +463,45 @@ export function Planner({
       }}
     />
   );
-  const list = (items: Occurrence[]) =>
+  const list = (items: Occurrence[], day?: string) =>
     items.length ? (
       <div className="task-list">{items.map(card)}</div>
+    ) : day ? (
+      <div className="week-empty">
+        <p className="muted">{t("No tasks for this day.")}</p>
+        <button onClick={() => setEditor({ task: blank(day) })}>
+          {t("Add a task")}
+        </button>
+      </div>
+    ) : reviewing ? (
+      <div className="empty-state">
+        <h3>{t("No matching plans in this period.")}</h3>
+        <p>{t("Try another date range or clear your filters.")}</p>
+        <button
+          onClick={() => {
+            setQuery("");
+            setHistoryState("all");
+            setHistoryPriority("all");
+            setHistoryDefinition(undefined);
+          }}
+        >
+          {t("Clear filters")}
+        </button>
+      </div>
     ) : (
       <div className="empty-state">
         <span aria-hidden="true">✳</span>
-        <h3>{t("A little breathing room.")}</h3>
-        <p>{t("Add something that matters to you.")}</p>
-        <button onClick={() => setEditor({ task: blank() })}>
+        <h3>
+          {all.length && mode === "Day"
+            ? t("No unfinished tasks for this day.")
+            : t("A little breathing room.")}
+        </h3>
+        <p>
+          {all.length && mode === "Day"
+            ? t("Completed and skipped tasks are below.")
+            : t("Add something that matters to you.")}
+        </p>
+        <button onClick={() => setEditor({ task: blank(day) })}>
           <Plus size={18} />
           {t("Add a task")}
         </button>
@@ -653,12 +691,24 @@ export function Planner({
                 </small>
                 <div className="row group-control">
                   <h3>{t("Your plans")}</h3>
-                  <button
-                    aria-pressed={grouped}
-                    onClick={() => setGrouped(!grouped)}
+                  <div
+                    className="period-control"
+                    role="group"
+                    aria-label={t("Month details")}
                   >
-                    {grouped ? t("Grouped") : t("All occurrences")}
-                  </button>
+                    <button
+                      aria-pressed={grouped}
+                      onClick={() => setGrouped(true)}
+                    >
+                      {t("Grouped")}
+                    </button>
+                    <button
+                      aria-pressed={!grouped}
+                      onClick={() => setGrouped(false)}
+                    >
+                      {t("All occurrences")}
+                    </button>
+                  </div>
                 </div>
               </>
             )}
@@ -689,7 +739,10 @@ export function Planner({
                       <h3>
                         {label(day, { weekday: "short", day: "numeric" })}
                       </h3>
-                      {list(all.filter((item) => item.schedule.date === day))}
+                      {list(
+                        all.filter((item) => item.schedule.date === day),
+                        day,
+                      )}
                     </section>
                   ),
                 )}
@@ -712,6 +765,17 @@ export function Planner({
               list(all)
             )}
           </>
+        )}
+        {tab === "Search" && (
+          <label className="search-field">
+            {t("Search titles and notes")}
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t("A title or something in your notes")}
+            />
+          </label>
         )}
         {reviewing && (
           <PlannerHistoryFilters
@@ -739,19 +803,25 @@ export function Planner({
         )}
         {tab === "Search" && (
           <>
-            <label className="search-field">
-              {t("Search this month")}
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={t("A title or something in your notes")}
-              />
-            </label>
             <p className="muted">
               {t(
-                "Searching the selected period, {v0} to {v1}. Older history search is still being connected.",
-                { v0: from, v1: through },
+                "Searching {v0} to {v1}. Change the dates to look in another period.",
+                {
+                  v0: civilDate.safeParse(historyFrom).success
+                    ? label(historyFrom, {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : "—",
+                  v1: civilDate.safeParse(historyThrough).success
+                    ? label(historyThrough, {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : "—",
+                },
               )}
             </p>
             {list(historicalItems)}

@@ -37,7 +37,13 @@ function fixture(coverage?: ReminderCoverageAdapter) {
     },
     schedule: async (key, item, plan, ownerId) => {
       calls++;
-      actual.set(key, { nativeId: key, key, ownerId, due: plan.due });
+      actual.set(key, {
+        nativeId: key,
+        key,
+        ownerId,
+        due: plan.due,
+        ...(plan.kind === "summary" ? { summaryCount: plan.count } : {}),
+      });
       if (crash) {
         crash = false;
         throw new Error("Interrupted after OS scheduling");

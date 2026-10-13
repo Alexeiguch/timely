@@ -15,10 +15,7 @@ import {
   type Operation,
   type Command,
 } from "@timely/contracts";
-import {
-  occurrenceTarget,
-  remoteReminderCandidates,
-} from "@timely/sync";
+import { occurrenceTarget, remoteReminderCandidates } from "@timely/sync";
 import { setState } from "@timely/domain";
 describe.skipIf(process.env.RUN_DB_TESTS !== "1")(
   "real PostgreSQL push ownership and lifecycle",
@@ -116,6 +113,191 @@ describe.skipIf(process.env.RUN_DB_TESTS !== "1")(
     });
     afterAll(async () => {
       await connection!.client.end();
+    });
+    it("sends one current-state summary and rejects same-day repeats after a time change", async () => {
+      const f = await create();
+      const config = {
+        ...input(),
+        dailySummary: { enabled: true, time: "18:00" },
+      };
+      await prepare(ownerId, config, projectId);
+      await repo!.commit(
+        ownerId,
+        { deviceId, cursor: f.cursor, entries: [], handled: [] },
+        now,
+      );
+      const due = Date.parse("2026-10-08T18:00:00Z");
+      const job = (await repo!.due(due)).find((job) => job.kind === "summary")!;
+      expect(job).toBeDefined();
+      const claimed = await repo!.claim(job, due + 1000);
+      expect(claimed?.summaryCount).toBe(1);
+      expect(claimed?.item).toBeNull();
+      await repo!.finish(
+        job,
+        { status: "ticket", receiptId: "synthetic-summary-receipt" },
+        due + 1000,
+      );
+      await prepare(
+        ownerId,
+        { ...config, dailySummary: { enabled: true, time: "19:00" } },
+        projectId,
+      );
+      await repo!.commit(
+        ownerId,
+        { deviceId, cursor: f.cursor, entries: [], handled: [] },
+        due + 2000,
+      );
+      const later = (await repo!.due(due + 3600000)).find(
+        (job) => job.kind === "summary",
+      )!;
+      expect(later).toBeDefined();
+      expect(await repo!.claim(later, due + 3601000)).toBeNull();
+    });
+    it("cancels the summary after the last task is completed and never claims another owner's device", async () => {
+      const f = await create();
+      await prepare(
+        ownerId,
+        { ...input(), dailySummary: { enabled: true, time: "18:00" } },
+        projectId,
+      );
+      await repo!.commit(
+        ownerId,
+        { deviceId, cursor: f.cursor, entries: [], handled: [] },
+        now,
+      );
+      const [job] = await db!
+        .select()
+        .from(notificationJobs)
+        .where(
+          and(
+            eq(notificationJobs.ownerId, ownerId),
+            eq(notificationJobs.kind, "summary"),
+          ),
+        );
+      const item = f.plans[0]!.item;
+      await sync!.push(ownerId, {
+        protocolVersion: 1,
+        deviceId,
+        operations: [
+          operation(f.task.id, {
+            type: "state",
+            target: occurrenceTarget(item),
+            state: "completed",
+            terminal: setState(item, "completed", "UTC", now).terminal,
+          }),
+        ],
+      });
+      const cursor = (await sync!.bootstrap(ownerId, {})).watermark;
+      await repo!.commit(
+        ownerId,
+        { deviceId, cursor, entries: [], handled: [] },
+        now + 1000,
+      );
+      expect(
+        await repo!.claim(job!, Date.parse("2026-10-08T18:00:01Z")),
+      ).toBeNull();
+      await expect(
+        repo!.prepare(
+          otherOwner,
+          { ...input(), dailySummary: { enabled: true, time: "18:00" } },
+          projectId,
+          environment,
+        ),
+      ).rejects.toThrow(/Register/);
+    });
+    it("expires missed summaries and protects elapsed local ownership from remote fallback", async () => {
+      const f = await create();
+      const config = {
+        ...input(),
+        dailySummary: { enabled: true, time: "18:00" },
+      };
+      await prepare(ownerId, config, projectId);
+      const plans = remoteReminderCandidates(
+        [f.record],
+        defaults,
+        deviceId,
+        "UTC",
+        now,
+        config.dailySummary,
+      );
+      const summary = plans.find((x) => x.plan.kind === "summary")!;
+      const entry = {
+        key: summary.key,
+        occurrenceId: summary.plan.occurrenceId,
+        version: summary.plan.version,
+        kind: summary.plan.kind,
+        day: summary.day,
+        due: summary.plan.due,
+      };
+      await repo!.commit(
+        ownerId,
+        { deviceId, cursor: f.cursor, entries: [entry], handled: [] },
+        now,
+      );
+      expect(
+        (await repo!.due(summary.plan.due + 1000)).filter(
+          (x) => x.kind === "summary",
+        ),
+      ).toEqual([]);
+      await prepare(
+        ownerId,
+        { ...config, dailySummary: { enabled: true, time: "19:00" } },
+        projectId,
+      );
+      await repo!.commit(
+        ownerId,
+        { deviceId, cursor: f.cursor, entries: [], handled: [] },
+        summary.plan.due + 1000,
+      );
+      const [elapsed] = await db!
+        .select()
+        .from(notificationJobs)
+        .where(eq(notificationJobs.key, summary.key));
+      expect(elapsed?.status).toBe("handled");
+      const later = (await repo!.due(summary.plan.due + 3600000)).find(
+        (x) => x.kind === "summary",
+      )!;
+      expect(await repo!.claim(later, summary.plan.due + 3601000)).toBeNull();
+    });
+    it("never creates a missed summary and expires an existing job after its short delivery window", async () => {
+      const f = await create();
+      const config = {
+        ...input(),
+        dailySummary: { enabled: true, time: "18:00" },
+      };
+      await prepare(ownerId, config, projectId);
+      const late = Date.parse("2026-10-08T18:10:00Z");
+      await repo!.commit(
+        ownerId,
+        { deviceId, cursor: f.cursor, entries: [], handled: [] },
+        late,
+      );
+      expect(
+        await db!
+          .select()
+          .from(notificationJobs)
+          .where(
+            and(
+              eq(notificationJobs.ownerId, ownerId),
+              eq(notificationJobs.kind, "summary"),
+            ),
+          ),
+      ).toHaveLength(0);
+      await repo!.commit(
+        ownerId,
+        { deviceId, cursor: f.cursor, entries: [], handled: [] },
+        now,
+      );
+      const [job] = await db!
+        .select()
+        .from(notificationJobs)
+        .where(
+          and(
+            eq(notificationJobs.ownerId, ownerId),
+            eq(notificationJobs.kind, "summary"),
+          ),
+        );
+      expect(await repo!.claim(job!, late)).toBeNull();
     });
     it("pauses only the uploading account's installation, atomically with valid edits", async () => {
       const f = await create();

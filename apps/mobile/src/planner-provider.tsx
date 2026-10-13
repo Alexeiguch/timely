@@ -1,4 +1,6 @@
 import { t, errorMessage, type Parameters } from "@timely/i18n";
+import { router } from "expo-router";
+import type { DailySummaryPolicy } from "@timely/contracts";
 import { useLanguage } from "./language-state";
 import {
   createContext,
@@ -40,6 +42,7 @@ import {
   streakSummaries,
   accountActions,
   LocalReminderScheduler,
+  DailySummarySettings,
   linkedOccurrence,
   loadHistory,
   type LocalState,
@@ -92,6 +95,7 @@ type Planner = {
   setMode: (mode: PlannerMode) => void;
   preferences: Preferences;
   setPreferences: (patch: PreferencePatch) => Promise<void>;
+  setDailySummary: (policy: Partial<DailySummaryPolicy>) => Promise<void>;
   grouped: boolean;
   setGrouped: (value: boolean) => void;
   sync: () => Promise<void>;
@@ -155,13 +159,16 @@ export function PlannerProvider({
       ),
     [store, pushCoverage],
   );
-  const reconcileReminders = useCallback(() =>
-    reminders.run().catch(() => {
-      if (alive.current)
-        setMessage(
-          "Some reminders could not be updated. Open Settings to retry.",
-        );
-    }), [reminders]);
+  const reconcileReminders = useCallback(
+    () =>
+      reminders.run().catch(() => {
+        if (alive.current)
+          setMessage(
+            "Some reminders could not be updated. Open Settings to retry.",
+          );
+      }),
+    [reminders],
+  );
   const engine = useMemo(
     () =>
       new SyncEngine(
@@ -294,6 +301,16 @@ export function PlannerProvider({
         typeof data.day !== "string"
       )
         return;
+      if (data.kind === "summary") {
+        if (data.ownerId === ownerId) {
+          setSelected(today(Intl.DateTimeFormat().resolvedOptions().timeZone));
+          setMode("Day");
+          setEditor(null);
+          router.replace("/(tabs)");
+        }
+        await Notifications.clearLastNotificationResponseAsync();
+        return;
+      }
       const item = linkedOccurrence(
         visibleRecords(await store.read()).records,
         {
@@ -404,6 +421,11 @@ export function PlannerProvider({
     mode,
     setMode,
     preferences,
+    setDailySummary: async (policy) => {
+      await DailySummarySettings.update(store, policy);
+      await reconcileReminders();
+      reload();
+    },
     setPreferences: async (patch) => {
       await savePreferences(store, patch, Crypto.randomUUID);
       await reconcileReminders();

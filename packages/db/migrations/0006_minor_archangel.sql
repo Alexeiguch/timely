@@ -1,0 +1,2 @@
+ALTER TABLE "timely"."notification_devices" ADD COLUMN "summary_enabled" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "timely"."notification_devices" ADD COLUMN "summary_time" text DEFAULT '18:00' NOT NULL;

@@ -47,18 +47,20 @@ export function expoPush(fetcher: typeof fetch = fetch) {
       data: Record<string, unknown>;
       expiration: number;
       collapseId: string;
+      silent?: boolean;
     }): Promise<Result> {
       expoPushTokenSchema.parse(message.to);
+      const { silent, ...payload } = message;
       try {
         const response = await fetcher("https://exp.host/--/api/v2/push/send", {
           method: "POST",
           headers: headers(),
           signal: AbortSignal.timeout(10000),
           body: JSON.stringify({
-            ...message,
-            sound: "default",
-            priority: "high",
-            channelId: "plans",
+            ...payload,
+            sound: silent ? null : "default",
+            priority: silent ? "normal" : "high",
+            channelId: silent ? "daily-summary" : "plans",
             tag: message.collapseId,
           }),
         });

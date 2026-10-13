@@ -1,5 +1,22 @@
 import { z } from "zod";
-import { civilDate, id, zone } from "./model";
+import { civilDate, id, localTime, zone } from "./model";
+export const dailySummarySchema = z
+  .object({
+    enabled: z.boolean(),
+    time: localTime,
+  })
+  .strict();
+export type DailySummaryPolicy = z.infer<typeof dailySummarySchema>;
+export const dailySummaryDefaults: DailySummaryPolicy = {
+  enabled: false,
+  time: "18:00",
+};
+export const notificationPreparationResponseSchema = z
+  .object({
+    blocked: z.array(id).max(48),
+    summaryHandledDays: z.array(civilDate).max(16).optional(),
+  })
+  .strict();
 export const notificationPermissionSchema = z.enum([
   "granted",
   "denied",
@@ -19,6 +36,7 @@ export const notificationRegistrationSchema = z
     language: z.enum(["es", "en"]),
     permission: notificationPermissionSchema,
     keys: z.array(id).max(48),
+    dailySummary: dailySummarySchema.optional(),
   })
   .strict()
   .refine(
@@ -30,7 +48,7 @@ export const localCoverageEntrySchema = z
     key: id,
     occurrenceId: id,
     version: id,
-    kind: z.enum(["before", "overdue"]),
+    kind: z.enum(["before", "overdue", "summary"]),
     due: z.number().int().nonnegative(),
     day: civilDate,
   })

@@ -1,6 +1,6 @@
 import { t } from "@timely/i18n";
 import { useLanguage } from "./language-state";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -16,7 +16,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { X, Check } from "lucide-react-native";
+import { X, Check, ChevronDown, ChevronUp } from "lucide-react-native";
 import {
   SafeAreaProvider,
   SafeAreaView,
@@ -38,6 +38,7 @@ export function Button({
   variant = "secondary",
   style,
   children,
+  expanded,
 }: {
   title: string;
   onPress: () => void;
@@ -48,6 +49,7 @@ export function Button({
   variant?: "primary" | "secondary" | "ghost" | "destructive";
   style?: StyleProp<ViewStyle>;
   children?: ReactNode;
+  expanded?: boolean;
 }) {
   useLanguage();
   const filled = active || variant === "primary";
@@ -59,6 +61,7 @@ export function Button({
         selected: active,
         disabled: disabled || loading,
         busy: loading,
+        expanded,
       }}
       disabled={disabled || loading}
       onPress={onPress}
@@ -87,6 +90,34 @@ export function Button({
         {title}
       </Text>
     </Pressable>
+  );
+}
+export function Disclosure({
+  title,
+  children,
+  initiallyOpen = false,
+}: {
+  title: string;
+  children: ReactNode;
+  initiallyOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(initiallyOpen);
+  return (
+    <View style={s.field}>
+      <Button
+        title={title}
+        expanded={open}
+        variant="ghost"
+        onPress={() => setOpen(!open)}
+      >
+        {open ? (
+          <ChevronUp size={18} color={colors.primary} />
+        ) : (
+          <ChevronDown size={18} color={colors.primary} />
+        )}
+      </Button>
+      {open && <View style={s.field}>{children}</View>}
+    </View>
   );
 }
 export function IconButton({

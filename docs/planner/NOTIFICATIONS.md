@@ -2,6 +2,14 @@
 
 ## Product timing
 
+The owner selected **one gentle daily summary** on 2026-10-12. Mobile Settings offers an opt-in summary per installation, initially at **18:00 local time**, with a time picker and off switch. It covers today's pending, non-deleted occurrences whose effective start is no later than the summary time; untimed plans qualify. It sends nothing on empty or fully completed/skipped days. It does not repeat old overdue backlogs. Explicit task-level Warn me reminders remain optional and independent.
+
+The summary has no sound or vibration, uses a quiet Android channel and does not interrupt an active foreground app with a banner. It contains only a localized count and gentle prompt, never task titles or notes. Tapping it opens today's current planner for the matching account.
+
+Use finite one-shot schedules through the same seven-day horizon and local/remote ownership protocol. At most one summary can be handled per installation/civil date, including after restart, time/zone changes or adding/reopening plans after delivery. Content/count edits update the pending notification without a new delivery identity; timing changes produce a new schedule version. Completing/skipping/deleting the last qualifying occurrence cancels it, and sign-out cancels the account's schedules. Summary entries get reserved space in the 48-entry local budget before optional task reminders.
+
+Never create a retroactive summary after its time. An already-planned remote job has a five-minute delivery window for scheduler/provider jitter and then expires; missed daily summaries do not catch up. A provider acceptance/response-loss remains uncertain and is not replayed. Locally elapsed ownership also consumes that date; the server must not issue a late replacement. Offline clients favor their established channel and wait for an acknowledged handoff before acquiring a competing remote-owned summary. Independent phones can each be explicitly enabled; this is not a global across-device visible-delivery guarantee.
+
 Warn me is task-level opt-in. Before and overdue reminders can be switched independently. Default timed reminders are **30 minutes before the effective start** and **10 minutes after the due boundary**, where duration determines the boundary when present. Defaults may be changed in Settings and optionally overridden per task.
 
 Untimed/duration-only tasks use a same-day morning reminder at **09:00 local time** initially and an overdue reminder at the configured morning time on the following local day. The task becomes overdue at the beginning of that following day; the notification intentionally waits until morning. This is distinct from the +10-minute timed rule.

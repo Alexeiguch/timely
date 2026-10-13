@@ -59,6 +59,7 @@ test("friendly duration and weekdays survive reload, and month markers follow sw
   await expect(page.getByRole("status")).toContainText("Synced");
   await page.getByRole("button", { name: "Add task", exact: true }).click();
   await page.getByLabel("Task title").fill("A friendly weekday plan");
+  await page.getByRole("button", { name: "Add optional details" }).click();
   await page
     .getByRole("button", { name: "Duration: 1 h", exact: true })
     .click();
@@ -184,6 +185,7 @@ test("streak opt-in, offline completion, ended deadlines and another device agre
   await expect(page.getByRole("status")).toContainText("Synced");
   await page.getByRole("button", { name: "Add task", exact: true }).click();
   await page.getByLabel("Task title").fill("Read a little each day");
+  await page.getByRole("button", { name: "Add optional details" }).click();
   await expect(page.getByLabel("Track a streak")).toHaveCount(0);
   await page
     .getByRole("combobox", { name: "Frequency", exact: true })
@@ -220,7 +222,7 @@ test("streak opt-in, offline completion, ended deadlines and another device agre
   await page.getByRole("button", { name: "Sync now", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Synced");
   await page.screenshot({
-    path: `docs/evidence/streak-active-${info.project.name}.png`,
+    path: `${process.env.QA_SCREENSHOT_DIR ?? "docs/evidence"}/streak-active-${info.project.name}.png`,
     fullPage: true,
   });
   const other = await browser.newContext({
@@ -240,6 +242,7 @@ test("streak opt-in, offline completion, ended deadlines and another device agre
   }
   await page.getByRole("button", { name: "Add task", exact: true }).click();
   await page.getByLabel("Task title").fill("A missed reading deadline");
+  await page.getByRole("button", { name: "Add optional details" }).click();
   await page.getByLabel("Date", { exact: true }).fill("2026-01-01");
   await page
     .getByRole("combobox", { name: "Frequency", exact: true })
@@ -257,7 +260,7 @@ test("streak opt-in, offline completion, ended deadlines and another device agre
     missed.getByRole("button", { name: "Skip", exact: true }),
   ).toHaveCount(0);
   await page.screenshot({
-    path: `docs/evidence/streak-ended-${info.project.name}.png`,
+    path: `${process.env.QA_SCREENSHOT_DIR ?? "docs/evidence"}/streak-ended-${info.project.name}.png`,
     fullPage: true,
   });
   expect(
@@ -311,7 +314,7 @@ test("offline reload retains edits, reconnect syncs another client, and recurren
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByText("Completed & skipped (1)", { exact: true }).click();
   await expect(
-    page.getByRole("checkbox", { name: "Complete A plan saved offline" }),
+    page.getByRole("checkbox", { name: "Reopen A plan saved offline" }),
   ).toBeChecked();
   await context.setOffline(false);
   await page.getByRole("button", { name: "Sync now", exact: true }).click();
@@ -331,13 +334,14 @@ test("offline reload retains edits, reconnect syncs another client, and recurren
     ).toBeVisible();
     await other.getByText("Completed & skipped (1)", { exact: true }).click();
     await expect(
-      other.getByRole("checkbox", { name: "Complete A plan saved offline" }),
+      other.getByRole("checkbox", { name: "Reopen A plan saved offline" }),
     ).toBeChecked();
   } finally {
     await second.close();
   }
   await page.getByRole("button", { name: "Add task", exact: true }).click();
   await page.getByLabel("Task title").fill("Ten minutes to reset");
+  await page.getByRole("button", { name: "Add optional details" }).click();
   await page
     .getByRole("combobox", { name: "Frequency", exact: true })
     .selectOption("daily");
@@ -347,7 +351,7 @@ test("offline reload retains edits, reconnect syncs another client, and recurren
     page.getByRole("heading", { name: "Ten minutes to reset" }),
   ).toBeVisible();
   await page.screenshot({
-    path: `docs/evidence/planner-day-${info.project.name}.png`,
+    path: `${process.env.QA_SCREENSHOT_DIR ?? "docs/evidence"}/planner-day-${info.project.name}.png`,
     fullPage: true,
   });
   expect(
@@ -361,7 +365,7 @@ test("offline reload retains edits, reconnect syncs another client, and recurren
     .getByRole("combobox", { name: "Apply changes to" })
     .selectOption("future");
   await page.screenshot({
-    path: `docs/evidence/planner-editor-${info.project.name}.png`,
+    path: `${process.env.QA_SCREENSHOT_DIR ?? "docs/evidence"}/planner-editor-${info.project.name}.png`,
     fullPage: false,
   });
   await page.getByRole("button", { name: "Save task", exact: true }).click();
@@ -374,7 +378,7 @@ test("offline reload retains edits, reconnect syncs another client, and recurren
   ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Month", exact: true }).click();
   await page.screenshot({
-    path: `docs/evidence/planner-month-${info.project.name}.png`,
+    path: `${process.env.QA_SCREENSHOT_DIR ?? "docs/evidence"}/planner-month-${info.project.name}.png`,
     fullPage: true,
   });
   expect(
@@ -457,22 +461,26 @@ test("moving, skipping and excluding an occurrence preserves its identity", asyn
     has: page.getByRole("heading", { name: "A movable little plan" }),
   });
   const id = await card.getAttribute("data-task-id");
+  await card.getByText("More actions", { exact: true }).click();
   await card.getByRole("button", { name: "Tomorrow", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "A movable little plan" }),
   ).not.toBeVisible();
   await page.getByRole("button", { name: "Next period" }).click();
   await expect(card).toHaveAttribute("data-task-id", id!);
+  await card.getByText("More actions", { exact: true }).click();
   await card.getByRole("button", { name: "Skip", exact: true }).click();
   await expect(
     page.getByText("Completed & skipped (1)", { exact: true }),
   ).toBeVisible();
   await page.getByText("Completed & skipped (1)", { exact: true }).click();
+  await card.getByText("More actions", { exact: true }).click();
   await card.getByRole("button", { name: "Unskip", exact: true }).click();
   await expect(
     page.getByText("Completed & skipped (1)", { exact: true }),
   ).not.toBeVisible();
   await expect(card).toHaveAttribute("data-task-id", id!);
+  await card.getByText("More actions", { exact: true }).click();
   await card
     .getByRole("button", { name: "Delete A movable little plan" })
     .click();
@@ -498,6 +506,7 @@ test("web scoped Undo, explicit date moves, restored navigation and historical f
   await page.goto("/");
   await page.getByRole("button", { name: "Add task", exact: true }).click();
   await page.getByLabel("Task title").fill("A lasting series");
+  await page.getByRole("button", { name: "Add optional details" }).click();
   await page
     .getByRole("combobox", { name: "Frequency", exact: true })
     .selectOption("daily");
@@ -506,6 +515,7 @@ test("web scoped Undo, explicit date moves, restored navigation and historical f
   const day = await page.getByLabel("Choose date").inputValue();
   await page.reload();
   await expect(page.getByLabel("Choose date")).toHaveValue(day);
+  await page.getByText("More actions", { exact: true }).click();
   await page.getByRole("button", { name: "Delete A lasting series" }).click();
   await page.getByLabel("Delete scope").selectOption("future");
   await page
@@ -519,6 +529,7 @@ test("web scoped Undo, explicit date moves, restored navigation and historical f
   await expect(
     page.getByRole("heading", { name: "A lasting series", exact: true }),
   ).toBeVisible();
+  await page.getByText("More actions", { exact: true }).click();
   await page
     .getByRole("button", { name: "Move A lasting series to a date" })
     .click();
@@ -541,11 +552,12 @@ test("web scoped Undo, explicit date moves, restored navigation and historical f
     .getByRole("button", { name: "Load online history", exact: true })
     .click();
   await expect(
-    page.getByText("Online snapshot for this range", { exact: true }),
+    page.getByText("Showing online history for this range", { exact: true }),
   ).toBeVisible();
   await expect(
     page.locator("article").filter({ hasText: `Moved from ${day}` }),
   ).toBeVisible();
+  await page.getByText("Filter plans", { exact: true }).click();
   await page
     .getByLabel("Task status", { exact: true })
     .selectOption("completed");
@@ -578,7 +590,7 @@ test("web scoped Undo, explicit date moves, restored navigation and historical f
       page.getByRole("button", { name: "Load online history", exact: true }),
     ).toBeEnabled();
     await expect(
-      page.getByText("Online snapshot for this range", { exact: true }),
+      page.getByText("Showing online history for this range", { exact: true }),
     ).toHaveCount(0);
   } finally {
     release();
@@ -607,6 +619,7 @@ test("confirmed account deletion removes local data and revokes a second real se
     await create(page, "Disposable deletion proof");
     await expect(page.getByRole("status")).toContainText("Synced");
     await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await page.getByText("Manage account", { exact: true }).click();
     await page
       .getByRole("button", { name: "Delete account", exact: true })
       .click();
@@ -750,4 +763,135 @@ test("IndexedDB upgrade preserves an offline creation, its identity, clock and o
   await expect(
     page.getByRole("heading", { name: "Preserved migration plan" }),
   ).toBeVisible();
+});
+
+test("quick add, optional drafts, task reminders and discard recovery preserve saved data", async ({
+  page,
+  context,
+}, info) => {
+  await signIn(context, `ux-editor-${randomUUID()}@example.test`);
+  await page.goto("/");
+  await expect(page.getByRole("status")).toContainText("Synced");
+  await page.getByRole("button", { name: "Add task", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("Notes", { exact: true })).toHaveCount(0);
+  await page.getByLabel("Task title").fill("  A simple plan  ");
+  await page.screenshot({
+    path: `${process.env.QA_SCREENSHOT_DIR ?? "/tmp/timely-ux-evidence"}/ux-quick-add-${info.project.name}.png`,
+  });
+  await dialog.getByRole("button", { name: "Save task", exact: true }).click();
+  const card = page.locator("article.task-card").filter({
+    has: page.getByRole("heading", { name: "A simple plan", exact: true }),
+  });
+  await expect(card).toBeVisible();
+  await expect(
+    card.getByRole("button", { name: "Delete A simple plan" }),
+  ).toHaveCount(0);
+  await card.getByRole("button", { name: "Edit A simple plan" }).click();
+  await page
+    .getByRole("textbox", { name: "Notes", exact: true })
+    .fill("Bring a notebook");
+  await page.getByLabel("Remind me about this task", { exact: true }).check();
+  await page.getByLabel("Before the task", { exact: true }).uncheck();
+  await page.getByRole("button", { name: "Hide optional details" }).click();
+  await page.getByRole("button", { name: "Add optional details" }).click();
+  await expect(
+    page.getByRole("textbox", { name: "Notes", exact: true }),
+  ).toHaveValue("Bring a notebook");
+  await expect(
+    page.getByLabel("Remind me about this task", { exact: true }),
+  ).toBeChecked();
+  await dialog.getByRole("button", { name: "Save task", exact: true }).click();
+  // The existing title and previous Synced label can remain visible while the
+  // atomic local write is still running. Wait for the editor's save completion.
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("status")).toContainText("Synced");
+  await page.reload();
+  await card.getByRole("button", { name: "Edit A simple plan" }).click();
+  await expect(
+    page.getByLabel("Before the task", { exact: true }),
+  ).not.toBeChecked();
+  await expect(page.getByLabel("When overdue", { exact: true })).toBeChecked();
+  await page.getByLabel("Task title").fill("An unsaved draft");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(
+    page.getByText("Discard unsaved changes?", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: "Keep editing" }),
+  ).toBeFocused();
+  await dialog.getByRole("button", { name: "Keep editing" }).click();
+  await expect(page.getByLabel("Task title")).toHaveValue("An unsaved draft");
+  await page.keyboard.press("Escape");
+  await dialog.getByRole("button", { name: "Discard", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(card).toBeVisible();
+  await expect(
+    card.getByText("Bring a notebook", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    card.getByRole("button", { name: "Edit A simple plan" }),
+  ).toBeFocused();
+});
+
+test("week quick add uses its own day and search explains the selected history range", async ({
+  page,
+  context,
+}, info) => {
+  await signIn(context, `ux-navigation-${randomUUID()}@example.test`);
+  await page.goto("/?date=2026-11-02&mode=Week");
+  const tuesday = page.locator(".week-agenda > section").nth(1);
+  await tuesday
+    .getByRole("button", { name: "Add a task", exact: true })
+    .click();
+  await page.getByLabel("Task title").fill("Tuesday's appointment");
+  await expect(
+    page.getByText("For 3 November 2026. A title is all you need."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Add optional details" }).click();
+  await expect(page.getByLabel("Date", { exact: true })).toHaveValue(
+    "2026-11-03",
+  );
+  await page.getByRole("button", { name: "Save task", exact: true }).click();
+  await expect(
+    tuesday.getByRole("heading", {
+      name: "Tuesday's appointment",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await page.getByLabel("From date", { exact: true }).fill("2026-11-01");
+  await page.getByLabel("Through date", { exact: true }).fill("2026-11-30");
+  await expect(
+    page.getByText(
+      "Searching 1 Nov 2026 to 30 Nov 2026. Change the dates to look in another period.",
+    ),
+  ).toBeVisible();
+  await page.getByLabel("Search titles and notes").fill("Does not exist");
+  await expect(
+    page.getByRole("heading", { name: "No matching plans in this period." }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".empty-state").getByRole("button", { name: "Add a task" }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Clear filters", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Tuesday's appointment", exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: `${process.env.QA_SCREENSHOT_DIR ?? "/tmp/timely-ux-evidence"}/ux-search-${info.project.name}.png`,
+    fullPage: true,
+  });
+  await page.getByLabel("From date", { exact: true }).fill("");
+  await expect(
+    page.locator(".history-filters").getByRole("alert"),
+  ).toContainText("Choose a date range");
+  await expect(page.getByLabel("Search titles and notes")).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });

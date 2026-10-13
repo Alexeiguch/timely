@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
-test.beforeEach(async ({ context }) => { await context.addInitScript(() => localStorage.setItem("timely-language", "en")); });
+test.beforeEach(async ({ context }) => {
+  await context.addInitScript(() =>
+    localStorage.setItem("timely-language", "en"),
+  );
+});
 import { randomUUID } from "node:crypto";
 test.beforeEach(async ({ context }) => {
   await context.setExtraHTTPHeaders({
@@ -15,7 +19,7 @@ test("email sign-in, reload restoration and sign-out through the real backend", 
     page.getByRole("heading", { name: "Welcome to your day" }),
   ).toBeVisible();
   await page.screenshot({
-    path: `docs/evidence/auth-${testInfo.project.name}.png`,
+    path: `${process.env.QA_SCREENSHOT_DIR ?? "docs/evidence"}/auth-${testInfo.project.name}.png`,
     fullPage: true,
   });
   expect(

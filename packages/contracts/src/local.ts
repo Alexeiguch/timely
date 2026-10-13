@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { dailySummarySchema } from "./notifications";
 import { id } from "./model";
 import { syncOperationSchema, syncRecordSchema } from "./commands";
 const integer = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -37,13 +38,16 @@ export const localStateSchema = z
       .object({
         retry: z.boolean(),
         permission: z.enum(["granted", "denied", "undetermined"]),
+        dailySummary: dailySummarySchema.optional(),
+        remoteSummaryPolicy: dailySummarySchema.optional(),
+        summaryHandled: z.record(z.string(), integer).optional(),
         mappings: z.record(
           z.string(),
           z
             .object({
               nativeId: z.string(),
               occurrenceId: id,
-              kind: z.enum(["before", "overdue"]),
+              kind: z.enum(["before", "overdue", "summary"]),
               version: id,
               due: integer,
               day: z.string(),

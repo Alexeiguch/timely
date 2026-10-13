@@ -12,6 +12,7 @@ import {
   lte,
   or,
   sql,
+  ne,
 } from "drizzle-orm";
 import {
   notificationRegistrationSchema,
@@ -24,13 +25,7 @@ import { database } from "./index";
 import * as t from "./planner-schema";
 type DB = ReturnType<typeof database>;
 export type NotificationJob = typeof t.notificationJobs.$inferSelect;
-const committed = [
-  "dispatching",
-  "ticket",
-  "delivered",
-  "uncertain",
-  "handled",
-];
+const committed = NotificationRecords.committed;
 const reversible = NotificationRecords.reversible;
 export const pushTokenHash = NotificationRecords.tokenHash;
 export function notificationRepository(db: DB = database()) {
@@ -41,6 +36,7 @@ export function notificationRepository(db: DB = database()) {
       input: unknown,
       projectId: string,
       environment: string,
+      now = Date.now(),
     ) {
       const value: NotificationRegistration =
         notificationRegistrationSchema.parse(input);
@@ -100,6 +96,8 @@ export function notificationRepository(db: DB = database()) {
             permission: value.permission,
             language: value.language,
             ready: false,
+            summaryEnabled: value.dailySummary?.enabled ?? false,
+            summaryTime: value.dailySummary?.time ?? "18:00",
           })
           .onConflictDoUpdate({
             target: [
@@ -113,6 +111,8 @@ export function notificationRepository(db: DB = database()) {
               permission: value.permission,
               language: value.language,
               ready: false,
+              summaryEnabled: value.dailySummary?.enabled ?? false,
+              summaryTime: value.dailySummary?.time ?? "18:00",
               error: null,
               updatedAt: new Date(),
             },
@@ -141,7 +141,20 @@ export function notificationRepository(db: DB = database()) {
                 ),
               )
           : [];
-        return { blocked: blocked.map((row) => row.key) };
+        return {
+          blocked: blocked.map((row) => row.key),
+          ...(value.dailySummary?.enabled
+            ? {
+                summaryHandledDays:
+                  await NotificationRecords.handledSummaryDays(
+                    tx,
+                    ownerId,
+                    value.deviceId,
+                    now,
+                  ),
+              }
+            : {}),
+        };
       });
     },
     async commit(ownerId: string, input: unknown, now = Date.now()) {
@@ -188,17 +201,18 @@ export function notificationRepository(db: DB = database()) {
           value.deviceId,
           device.zone,
           now,
+          NotificationRecords.summaryPolicy(push),
         );
         const desired = new Map(candidates.map((entry) => [entry.key, entry]));
         for (const entry of value.entries) {
           const canonical = desired.get(entry.key);
           if (
             !canonical ||
-            canonical.item.id !== entry.occurrenceId ||
+            canonical.plan.occurrenceId !== entry.occurrenceId ||
             canonical.plan.version !== entry.version ||
             canonical.plan.kind !== entry.kind ||
             canonical.plan.due !== entry.due ||
-            canonical.item.schedule.date !== entry.day
+            canonical.day !== entry.day
           )
             return { ready: false, retry: true };
         }
@@ -232,7 +246,8 @@ export function notificationRepository(db: DB = database()) {
               (entry) =>
                 !priorByKey.has(entry.key) &&
                 !(
-                  entry.plan.kind === "before" &&
+                  (entry.plan.kind === "before" ||
+                    entry.plan.kind === "summary") &&
                   entry.plan.due <= now &&
                   !claimed.has(entry.key)
                 ),
@@ -250,17 +265,20 @@ export function notificationRepository(db: DB = database()) {
         const statuses = new Map<string, string[]>();
         for (const job of existing) {
           if (!reversible.includes(job.status) || job.kind === "test") continue;
-          const status = !desired.has(job.key)
-            ? "cancelled"
-            : handled.has(job.key) && job.due <= now
+          const status =
+            job.kind === "summary" && job.status === "local" && job.due <= now
               ? "handled"
-              : claimed.has(job.key)
-                ? "local"
-                : job.status === "local"
-                  ? job.due <= now
-                    ? "handled"
-                    : "pending"
-                  : job.status;
+              : !desired.has(job.key)
+                ? "cancelled"
+                : handled.has(job.key) && job.due <= now
+                  ? "handled"
+                  : claimed.has(job.key)
+                    ? "local"
+                    : job.status === "local"
+                      ? job.due <= now
+                        ? "handled"
+                        : "pending"
+                      : job.status;
           if (status !== job.status) {
             const keys = statuses.get(status) ?? [];
             keys.push(job.key);
@@ -434,6 +452,7 @@ export function notificationRepository(db: DB = database()) {
                   device.id,
                   device.zone,
                   now,
+                  NotificationRecords.summaryPolicy(push),
                 )
               : [];
           const desired = new Set(candidates.map((entry) => entry.key));
@@ -459,7 +478,11 @@ export function notificationRepository(db: DB = database()) {
               .filter(
                 (entry) =>
                   !priorKeys.has(entry.key) &&
-                  !(entry.plan.kind === "before" && entry.plan.due <= now),
+                  !(
+                    (entry.plan.kind === "before" ||
+                      entry.plan.kind === "summary") &&
+                    entry.plan.due <= now
+                  ),
               )
               .map((entry) =>
                 NotificationRecords.jobValues(ownerId, device.id, entry),
@@ -470,6 +493,11 @@ export function notificationRepository(db: DB = database()) {
               (job) =>
                 reversible.includes(job.status) &&
                 job.kind !== "test" &&
+                !(
+                  job.kind === "summary" &&
+                  job.status === "local" &&
+                  job.due <= now
+                ) &&
                 !desired.has(job.key),
             )
             .map((job) => job.key);
@@ -477,7 +505,20 @@ export function notificationRepository(db: DB = database()) {
             tx,
             ownerId,
             device.id,
-            new Map([["cancelled", cancelled]]),
+            new Map([
+              ["cancelled", cancelled],
+              [
+                "handled",
+                existing
+                  .filter(
+                    (job) =>
+                      job.kind === "summary" &&
+                      job.status === "local" &&
+                      job.due <= now,
+                  )
+                  .map((job) => job.key),
+              ],
+            ]),
           );
           await tx
             .update(t.notificationDevices)
@@ -600,8 +641,39 @@ export function notificationRepository(db: DB = database()) {
                 device.id,
                 device.zone,
                 now,
+                NotificationRecords.summaryPolicy(push),
               ).find((entry) => entry.key === current.key);
-        const valid = current.kind === "test" || !!canonical;
+        const consumedSummary =
+          current.kind === "summary" && current.day
+            ? await tx
+                .select({ key: t.notificationJobs.key })
+                .from(t.notificationJobs)
+                .where(
+                  and(
+                    eq(t.notificationJobs.ownerId, job.ownerId),
+                    eq(t.notificationJobs.deviceId, job.deviceId),
+                    eq(t.notificationJobs.kind, "summary"),
+                    eq(t.notificationJobs.day, current.day!),
+                    ne(t.notificationJobs.key, current.key),
+                    or(
+                      inArray(t.notificationJobs.status, committed),
+                      and(
+                        eq(t.notificationJobs.status, "local"),
+                        lte(t.notificationJobs.due, now),
+                      ),
+                    ),
+                  ),
+                )
+                .limit(1)
+            : [];
+        const valid =
+          (current.kind === "test" ||
+            (!!canonical &&
+              canonical.plan.due === current.due &&
+              canonical.plan.version === current.version &&
+              canonical.day === current.day &&
+              canonical.plan.occurrenceId === current.occurrenceId)) &&
+          !consumedSummary.length;
         if (!valid || current.expires <= now) {
           await tx
             .update(t.notificationJobs)
@@ -630,7 +702,15 @@ export function notificationRepository(db: DB = database()) {
               eq(t.notificationJobs.key, job.key),
             ),
           );
-        return { job: current, push, item: canonical?.item ?? null };
+        return {
+          job: current,
+          push,
+          item: canonical?.item ?? null,
+          summaryCount:
+            canonical?.plan.kind === "summary"
+              ? canonical.plan.count
+              : undefined,
+        };
       });
     },
     async finish(

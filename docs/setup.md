@@ -158,6 +158,14 @@ The language suite checks Spanish default, both choices, reload/cross-tab persis
 
 ## Expo remote notifications
 
+### Gentle daily summary
+
+In the updated mobile app, open **Settings → Reminders → Daily summary** (Spanish: **Ajustes → Recordatorios → Resumen diario**), enable it and accept notification permission. The initial time is 18:00 in the device's time zone; change it or turn it off there. This setting is installation-local, including offline persistence. Local scheduling does not need Expo server credentials or Inngest. Today’s finished/skipped/deleted plans are excluded, and empty days do not notify. A quiet summary contains only the number of remaining plans and opens the current planner when tapped.
+
+Before releasing the updated backend, apply additive migration **0006_minor_archangel.sql**, after the previous migrations, to a rehearsed deployment database. TestFlight 0.1.0 (2) predates this implementation; a new mobile build is required for the control and scheduling service. Existing task clients remain protocol-compatible.
+
+Hosted remote activation is `blocked_external` until the owner configures server-only `EXPO_ACCESS_TOKEN`, `INNGEST_SIGNING_KEY`, `INNGEST_EVENT_KEY`, the matching `EXPO_PUSH_PROJECT_ID`, and a signed Inngest connection to the production `/api/inngest` endpoint with its `reminder-sweep` minute cron. Verify that cadence and real physical-device delivery before enabling `EXPO_PUSH_ENABLED=true`. Do not paste secrets into chat or add them to public Expo variables. Local worker setup and the established APNs/FCM requirements follow below.
+
 Use the existing linked Expo project `@guchinale/timely` (`ccd23170-5d7c-4937-8cb1-9a42ab67ccf4`). Native `extra.eas.projectId` and backend `EXPO_PUSH_PROJECT_ID` must match. A public project ID is not a credential. Do not add any push provider secret to an `EXPO_PUBLIC_*` variable.
 
 1. Apply migrations 0003/0004 to local development PostgreSQL, not the unrelated root production Neon environment:

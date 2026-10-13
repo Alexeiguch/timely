@@ -32,9 +32,17 @@ test("Spanish default, English switch, reload and cross-tab preference persisten
   await expect(page.locator("html")).toHaveAttribute("lang", "es");
   await expect(page.getByLabel("Correo electrónico")).toBeVisible();
   await expect(page.getByRole("status")).toBeEmpty();
-  await expect(
-    page.getByRole("button", { name: "Continuar con Google" }),
-  ).toBeVisible();
+  const providers = await (
+    await context.request.get("/api/v1/auth/providers")
+  ).json();
+  if (providers.google)
+    await expect(
+      page.getByRole("button", { name: "Continuar con Google" }),
+    ).toBeVisible();
+  else
+    await expect(
+      page.getByRole("button", { name: "Continuar con Google" }),
+    ).toHaveCount(0);
   await page.getByRole("button", { name: "English", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect(page.getByLabel("Email address")).toBeVisible();
@@ -76,6 +84,9 @@ test("Spanish OTP, recurring task and language changes preserve authored content
   await expect(page.getByRole("status")).toContainText("Sincronizado");
   await page.getByRole("button", { name: "Añadir tarea", exact: true }).click();
   await page.getByLabel("Título de la tarea").fill("Settings");
+  await page
+    .getByRole("button", { name: "Añadir detalles opcionales" })
+    .click();
   await page.getByRole("textbox", { name: "Notas", exact: true }).fill("Month");
   await page
     .getByRole("combobox", { name: "Frecuencia", exact: true })
@@ -125,5 +136,7 @@ test("Spanish OTP, recurring task and language changes preserve authored content
     page.getByRole("combobox", { name: "Frecuencia", exact: true }),
   ).toHaveValue("daily");
   await expect(page.getByLabel("Título de la tarea")).toHaveValue("Settings");
-  await expect(page.getByRole("textbox", { name: "Notas", exact: true })).toHaveValue("Month");
+  await expect(
+    page.getByRole("textbox", { name: "Notas", exact: true }),
+  ).toHaveValue("Month");
 });

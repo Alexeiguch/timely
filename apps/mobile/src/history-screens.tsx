@@ -158,28 +158,33 @@ function History({ search }: { search: boolean }) {
                   : t("Date & status filters \u00B7 {v0}", { v0: t(filter) })
               }
               variant="ghost"
+              expanded={filtersOpen}
               onPress={() => setFiltersOpen(!filtersOpen)}
             />
             <Text style={s.muted}>
-              {t("Downloaded plans \u00B7 {v0} \u2013 {v1}", {
-                v0: formatCivilDate(
-                  from,
-                  {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  },
-                  locale(),
-                ),
-                v1: formatCivilDate(
-                  through,
-                  {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  },
-                  locale(),
-                ),
+              {t("Date range: {v0} – {v1}", {
+                v0: civilDate.safeParse(from).success
+                  ? formatCivilDate(
+                      from,
+                      {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      },
+                      locale(),
+                    )
+                  : "—",
+                v1: civilDate.safeParse(through).success
+                  ? formatCivilDate(
+                      through,
+                      {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      },
+                      locale(),
+                    )
+                  : "—",
               })}
             </Text>
             {filtersOpen && (
@@ -205,6 +210,7 @@ function History({ search }: { search: boolean }) {
                   options={[
                     { value: "all", label: t("All") },
                     { value: "overdue", label: t("Overdue") },
+                    { value: "pending", label: t("Unfinished") },
                     { value: "completed", label: t("Completed") },
                     { value: "skipped", label: t("Skipped") },
                   ]}
@@ -249,7 +255,7 @@ function History({ search }: { search: boolean }) {
             {!search && (
               <View style={s.notice}>
                 <Text style={s.section}>
-                  {t("{v0} / {v1} scheduled", {
+                  {t("Completed: {v0} / {v1} scheduled", {
                     v0: scheduled.completed,
                     v1: scheduled.total,
                   })}
@@ -267,6 +273,9 @@ function History({ search }: { search: boolean }) {
                   })}
                 </Text>
                 <Text style={[s.muted, s.onAccent]}>
+                  {t("Progress reflects plans saved on this device.")}
+                </Text>
+                <Text style={[s.muted, s.onAccent]}>
                   {t(
                     "Skipped tasks are excluded from both totals. Upcoming tasks are excluded from completion rate.",
                   )}
@@ -279,9 +288,9 @@ function History({ search }: { search: boolean }) {
           <View style={s.field}>
             <Text style={s.muted}>
               {remote
-                ? t("Online historical snapshot for this range")
+                ? t("Showing online history for this range")
                 : t(
-                    "Downloaded plans are available offline. Online history checks a fixed server snapshot.",
+                    "Saved plans are available offline. Check online history for older plans from your account.",
                   )}
             </Text>
             {historyError && (
@@ -290,6 +299,7 @@ function History({ search }: { search: boolean }) {
               </Text>
             )}
             <Button
+              loading={loading}
               title={
                 remote && cursor
                   ? t("Load more history")
@@ -311,11 +321,30 @@ function History({ search }: { search: boolean }) {
           </View>
         }
         ListEmptyComponent={
-          <Text style={s.body}>
-            {error
-              ? t("Adjust the dates to see your plans.")
-              : t("No matching plans in this period.")}
-          </Text>
+          <View style={s.field}>
+            <Text style={s.body}>
+              {error
+                ? t("Adjust the dates to see your plans.")
+                : t("No matching plans in this period.")}
+            </Text>
+            {!error && (
+              <>
+                <Text style={s.muted}>
+                  {t("Try another date range or clear your filters.")}
+                </Text>
+                <Button
+                  title={t("Clear filters")}
+                  onPress={() => {
+                    setQuery("");
+                    setFilter("all");
+                    setPriority("all");
+                    setDefinitionId(undefined);
+                    setFiltersOpen(true);
+                  }}
+                />
+              </>
+            )}
+          </View>
         }
         renderItem={({ item }) => <TaskCard item={item} showDate />}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}

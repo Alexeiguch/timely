@@ -7,13 +7,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAccount } from "./account";
 import { usePlanner } from "./planner-provider";
 import { PlannerStatus } from "./planner-header";
-import { Button, Choices, Field, s } from "./ui";
+import { Button, Choices, Disclosure, Field, s } from "./ui";
 import { DateField } from "./date-field";
 import { requestReminderPermission } from "./notifications";
+import { dailySummaryDefaults } from "@timely/contracts";
 export function Settings() {
   useLanguage();
   const account = useAccount();
   const p = usePlanner();
+  const dailySummary = p.state?.reminders?.dailySummary ?? dailySummaryDefaults;
   const [before, setBefore] = useState(String(p.preferences.beforeMinutes));
   const [overdue, setOverdue] = useState(String(p.preferences.overdueMinutes));
   useEffect(() => {
@@ -84,26 +86,33 @@ export function Settings() {
               }
             />
           )}
-          <Button
-            title={t("Delete account")}
-            variant="destructive"
-            onPress={() =>
-              Alert.alert(
-                t("Delete your account permanently?"),
-                t(
-                  "All tasks, history and preferences will be deleted on every device. Unsynced changes here will be discarded. Sign in within the last five minutes before continuing.",
-                ),
-                [
-                  { text: t("Cancel"), style: "cancel" },
-                  {
-                    text: t("Delete account"),
-                    style: "destructive",
-                    onPress: () => p.act(p.deleteAccount),
-                  },
-                ],
-              )
-            }
-          />
+          <Disclosure title={t("Manage account")}>
+            <Text style={s.muted}>
+              {t(
+                "Deleting your account permanently removes your plans and history from every device.",
+              )}
+            </Text>
+            <Button
+              title={t("Delete account")}
+              variant="destructive"
+              onPress={() =>
+                Alert.alert(
+                  t("Delete your account permanently?"),
+                  t(
+                    "All tasks, history and preferences will be deleted on every device. Unsynced changes here will be discarded. Sign in within the last five minutes before continuing.",
+                  ),
+                  [
+                    { text: t("Cancel"), style: "cancel" },
+                    {
+                      text: t("Delete account"),
+                      style: "destructive",
+                      onPress: () => p.act(p.deleteAccount),
+                    },
+                  ],
+                )
+              }
+            />
+          </Disclosure>
         </View>
         <View style={s.card}>
           <Text style={s.section}>{t("Sync & offline")}</Text>
@@ -129,10 +138,12 @@ export function Settings() {
               )}
             </Text>
           )}
-          <Button
-            title={t("Retry saved changes")}
-            onPress={() => p.act(p.retry)}
-          />
+          {(!!p.state?.outbox.length || p.syncStatus === "Needs attention") && (
+            <Button
+              title={t("Retry saved changes")}
+              onPress={() => p.act(p.retry)}
+            />
+          )}
           {Array.from(
             new Set(
               p.state?.outbox
@@ -204,90 +215,93 @@ export function Settings() {
         </View>
         <View style={s.card}>
           <Text style={s.section}>{t("Reminders")}</Text>
-          <Text style={s.body}>
-            {t(
-              "Up to 48 reminders are scheduled locally for the next seven days. Remote reminders cover eligible plans beyond that local coverage when available.",
-            )}
-          </Text>
-          <Text style={s.muted}>
-            {t("Remote reminders: {v0}", {
-              v0: t(p.state?.reminders?.remoteStatus ?? "not-configured"),
-            })}
-          </Text>
-          <Button
-            title={t("Test remote notification")}
-            disabled={p.state?.reminders?.remoteStatus !== "ready"}
-            onPress={() => p.act(p.testPush)}
-          />
-          <Text style={s.muted}>
-            {t(
-              "Permission: {v0} \u00B7 {v1} scheduled \u00B7 {v2} outside local coverage",
-              {
-                v0: t(p.state?.reminders?.permission ?? "Not checked"),
-                v1: p.state?.reminders?.scheduled ?? 0,
-                v2: p.state?.reminders?.uncovered ?? 0,
-              },
-            )}
-          </Text>
-          {p.state?.reminders?.retry && (
-            <Text style={s.body}>
-              {t("Scheduling needs another attempt. Your plans remain saved.")}
-            </Text>
-          )}
           <View style={s.row}>
-            <Text style={s.body}>{t("Before task")}</Text>
+            <Text style={s.body}>{t("Daily summary")}</Text>
             <Switch
-              accessibilityLabel={t("Default before reminders")}
-              value={p.preferences.before}
-              onValueChange={(before) => reminderPatch({ before })}
-            />
-          </View>
-          <View style={s.row}>
-            <Text style={s.body}>{t("When overdue")}</Text>
-            <Switch
-              accessibilityLabel={t("Default overdue reminders")}
-              value={p.preferences.overdue}
-              onValueChange={(overdue) => reminderPatch({ overdue })}
-            />
-          </View>
-          <Field
-            label={t("Minutes before a timed task")}
-            value={before}
-            onChangeText={setBefore}
-            keyboardType="number-pad"
-          />
-          <Field
-            label={t("Minutes after a timed task is due")}
-            value={overdue}
-            onChangeText={setOverdue}
-            keyboardType="number-pad"
-          />
-          <Button
-            title={t("Save reminder timing")}
-            onPress={() => {
-              const beforeMinutes = Number(before),
-                overdueMinutes = Number(overdue);
-              if (
-                ![before, overdue].every((value) => /^\d+$/.test(value)) ||
-                ![beforeMinutes, overdueMinutes].every(
-                  (value) => value <= 10080,
-                )
-              ) {
-                Alert.alert(
-                  t("Check timing"),
-                  t("Use whole minutes between 0 and 10,080."),
-                );
-                return;
+              accessibilityLabel={t("Daily summary on this device")}
+              value={dailySummary.enabled}
+              onValueChange={(enabled) =>
+                p.act(async () => {
+                  if (enabled) await requestReminderPermission();
+                  await p.setDailySummary({ enabled });
+                })
               }
-              reminderPatch({ beforeMinutes, overdueMinutes });
-            }}
-          />
-          <DateField
-            label={t("Untimed morning reminder")}
-            mode="time"
-            value={p.preferences.morning}
-            onChange={(morning) => reminderPatch({ morning })}
-          />
+            />
+          </View>
+          <Text style={s.muted}>
+            {t(
+              "One quiet reminder for today's unfinished plans, without repeated alerts. Individual task reminders are optional.",
+            )}
+          </Text>
+          {dailySummary.enabled && (
+            <DateField
+              label={t("Daily summary time")}
+              mode="time"
+              value={dailySummary.time}
+              onChange={(time) => p.act(() => p.setDailySummary({ time }))}
+            />
+          )}
+          <Text style={s.muted}>
+            {t(
+              "Choose Remind me about this task in a task's details to add individual reminders.",
+            )}
+          </Text>
+          <Disclosure title={t("Task reminder defaults")}>
+            <View style={s.row}>
+              <Text style={s.body}>{t("Before task")}</Text>
+              <Switch
+                accessibilityLabel={t("Default before reminders")}
+                value={p.preferences.before}
+                onValueChange={(before) => reminderPatch({ before })}
+              />
+            </View>
+            <View style={s.row}>
+              <Text style={s.body}>{t("When overdue")}</Text>
+              <Switch
+                accessibilityLabel={t("Default overdue reminders")}
+                value={p.preferences.overdue}
+                onValueChange={(overdue) => reminderPatch({ overdue })}
+              />
+            </View>
+            <Field
+              label={t("Minutes before a timed task")}
+              value={before}
+              onChangeText={setBefore}
+              keyboardType="number-pad"
+            />
+            <Field
+              label={t("Minutes after a timed task is due")}
+              value={overdue}
+              onChangeText={setOverdue}
+              keyboardType="number-pad"
+            />
+            <Button
+              title={t("Save reminder timing")}
+              onPress={() => {
+                const beforeMinutes = Number(before),
+                  overdueMinutes = Number(overdue);
+                if (
+                  ![before, overdue].every((value) => /^\d+$/.test(value)) ||
+                  ![beforeMinutes, overdueMinutes].every(
+                    (value) => value <= 10080,
+                  )
+                ) {
+                  Alert.alert(
+                    t("Check timing"),
+                    t("Use whole minutes between 0 and 10,080."),
+                  );
+                  return;
+                }
+                reminderPatch({ beforeMinutes, overdueMinutes });
+              }}
+            />
+            <DateField
+              label={t("Untimed morning reminder")}
+              mode="time"
+              value={p.preferences.morning}
+              onChange={(morning) => reminderPatch({ morning })}
+            />
+          </Disclosure>
           <Button
             title={t("Enable device reminders")}
             onPress={() =>
@@ -297,6 +311,13 @@ export function Settings() {
               })
             }
           />
+          {p.state?.reminders?.permission === "denied" && (
+            <Text style={s.muted}>
+              {t(
+                "Notifications are off in your device settings. Your tasks are still saved.",
+              )}
+            </Text>
+          )}
           <Button
             title={t("Open device settings")}
             onPress={() => {
@@ -308,6 +329,40 @@ export function Settings() {
               );
             }}
           />
+          <Disclosure title={t("Notification status")}>
+            <Text style={s.body}>
+              {t(
+                "Up to 48 reminders are scheduled locally for the next seven days. Remote reminders cover eligible plans beyond that local coverage when available.",
+              )}
+            </Text>
+            <Text style={s.muted}>
+              {t("Remote reminders: {v0}", {
+                v0: t(p.state?.reminders?.remoteStatus ?? "not-configured"),
+              })}
+            </Text>
+            <Button
+              title={t("Test remote notification")}
+              disabled={p.state?.reminders?.remoteStatus !== "ready"}
+              onPress={() => p.act(p.testPush)}
+            />
+            <Text style={s.muted}>
+              {t(
+                "Permission: {v0} \u00B7 {v1} scheduled \u00B7 {v2} outside local coverage",
+                {
+                  v0: t(p.state?.reminders?.permission ?? "Not checked"),
+                  v1: p.state?.reminders?.scheduled ?? 0,
+                  v2: p.state?.reminders?.uncovered ?? 0,
+                },
+              )}
+            </Text>
+            {p.state?.reminders?.retry && (
+              <Text style={s.body}>
+                {t(
+                  "Scheduling needs another attempt. Your plans remain saved.",
+                )}
+              </Text>
+            )}
+          </Disclosure>
         </View>
       </ScrollView>
     </SafeAreaView>

@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
-import { recordSchema, preferenceRecordSchema } from "@timely/contracts";
+import { and, eq, inArray, lte, gt, or, isNotNull } from "drizzle-orm";
+import {
+  recordSchema,
+  preferenceRecordSchema,
+  dailySummarySchema,
+} from "@timely/contracts";
 import {
   CommandError,
   reducePreferences,
@@ -11,6 +15,47 @@ import * as t from "./planner-schema";
 /** Canonical notification reads and bounded writes inside owner transactions. */
 export class NotificationRecords {
   static readonly reversible = ["pending", "local"];
+  static readonly committed = [
+    "dispatching",
+    "ticket",
+    "delivered",
+    "uncertain",
+    "handled",
+  ];
+  static summaryPolicy(device: typeof t.notificationDevices.$inferSelect) {
+    return dailySummarySchema.parse({
+      enabled: device.summaryEnabled,
+      time: device.summaryTime,
+    });
+  }
+  static async handledSummaryDays(
+    tx: Tx,
+    ownerId: string,
+    deviceId: string,
+    now: number,
+  ) {
+    const rows = await tx
+      .select({ day: t.notificationJobs.day })
+      .from(t.notificationJobs)
+      .where(
+        and(
+          eq(t.notificationJobs.ownerId, ownerId),
+          eq(t.notificationJobs.deviceId, deviceId),
+          eq(t.notificationJobs.kind, "summary"),
+          isNotNull(t.notificationJobs.day),
+          gt(t.notificationJobs.expires, now - 8 * 86400000),
+          // A known local schedule that has elapsed must never fall back to remote push.
+          or(
+            inArray(t.notificationJobs.status, NotificationRecords.committed),
+            and(
+              eq(t.notificationJobs.status, "local"),
+              lte(t.notificationJobs.due, now),
+            ),
+          ),
+        ),
+      );
+    return [...new Set(rows.flatMap((row) => (row.day ? [row.day] : [])))];
+  }
   static tokenHash(token: string) {
     return createHash("sha256").update(token).digest("hex");
   }
@@ -58,11 +103,11 @@ export class NotificationRecords {
       ownerId,
       deviceId,
       key: entry.key,
-      occurrenceId: entry.item.id,
-      definitionId: entry.item.definitionId,
+      occurrenceId: entry.plan.occurrenceId,
+      definitionId: entry.item?.definitionId ?? null,
       version: entry.plan.version,
       kind: entry.plan.kind,
-      day: entry.item.schedule.date,
+      day: entry.day,
       due: entry.plan.due,
       expires: entry.expires,
     };
