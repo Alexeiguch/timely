@@ -131,6 +131,19 @@ small {
 .signin > .brand {
   grid-column: 1/-1;
   align-self: start;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: clamp(56px, 8vw, 80px);
+}
+.signin > .brand span {
+  display: grid;
+  place-items: center;
+  margin-left: 0;
+  width: 0.9em;
+  height: 0.9em;
+  font-size: inherit;
+  line-height: 1;
 }
 .welcome h1 {
   margin: 24px 0;

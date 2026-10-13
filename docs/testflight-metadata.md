@@ -51,3 +51,16 @@ Saved in Spanish (Mexico) and English (US) for build 2. They ask testers to chec
 - A public App Store release is a separate owner-authorized action. The current draft is 1.0, while beta builds are 0.1.0. Before submitting, choose the public version, complete required privacy/support/review fields and native acceptance, and upload a matching build.
 
 References: [beta test information](https://developer.apple.com/help/app-store-connect/test-a-beta-version/provide-test-information/), [app icons](https://developer.apple.com/help/app-store-connect/manage-app-information/add-an-app-icon/), [screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications).
+
+
+## Usability build 3 — 2026-10-13
+
+Apple accepted **0.1.0 (3)** from `8151368b02a725f7d8956d1e3f72beb14187ce75` and reported the package processing. Processing completion, Internal tester access and build-specific testing notes have not been verified; the browser session is signed out and Expo has no App Store Connect API key. Build 2 remains the last independently verified Internal build. The owner refreshed Xcode authentication and upload then succeeded. No public review submission occurred.
+
+Archive: `/tmp/timely-testflight-20261013/Timely.xcarchive`; durable IPA/manifest: `.local/releases/2026-10-13/testflight-build-3/`. SHA-256: `559bb7cd42c5206c92f8939c11b4e4e66c48f7d571f861dc123710645e018ce4`. Signature, production entitlement/API, embedded bundle, identity and encryption flag pass. Nonfatal missing vendor-framework dSYM warnings remain. EAS production counter is **3**; the next unused build is **4**. [Full release evidence](progress.md#authorized-usability-deployment--2026-10-13).
+
+### Prepared testing notes (not saved to Apple)
+
+English: Try the simpler task editor, repeat options, Search filters and reminder settings. Check that unfinished work and date ranges are clear. Save an edit offline and reconnect. Daily summaries are opt-in on this installation; check local delivery and cancellation on a physical device. Hosted remote notifications remain disabled.
+
+Spanish: Prueba el editor de tareas más sencillo, las opciones de repetición, los filtros de búsqueda y los ajustes de recordatorios. Comprueba que las tareas pendientes y los intervalos de fechas se entiendan. Guarda un cambio sin conexión y vuelve a conectarte. El resumen diario es opcional en esta instalación; comprueba la entrega local y la cancelación en un dispositivo físico. Las notificaciones remotas siguen desactivadas.

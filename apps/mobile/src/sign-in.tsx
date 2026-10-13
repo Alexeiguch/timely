@@ -213,7 +213,7 @@ export function SignIn() {
         >
           <View style={[s.hero, sent && s.codeHero]}>
             <View style={s.heroTop}>
-              <Brand />
+              <Brand large />
               {!sent && <PlannerDoodle width={84} height={70} />}
             </View>
             <Text accessibilityRole="header" style={s.title}>
@@ -408,6 +408,7 @@ const s = StyleSheet.create({
   },
   heroTop: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
