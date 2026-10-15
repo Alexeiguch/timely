@@ -29,6 +29,51 @@ type Props = {
   ) => Promise<void>;
   onClose: () => void;
 };
+function DiscardConfirmation({
+  onKeepEditing,
+  onDiscard,
+}: {
+  onKeepEditing: () => void;
+  onDiscard: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const keepEditing = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const element = dialog.current!;
+    element.showModal();
+    keepEditing.current?.focus();
+    return () => {
+      element.close();
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
+  }, []);
+  return (
+    <dialog
+      ref={dialog}
+      className="discard-confirmation"
+      role="alertdialog"
+      aria-labelledby="discard-title"
+      aria-describedby="discard-description"
+      onCancel={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onKeepEditing();
+      }}
+    >
+      <h3 id="discard-title">{t("Discard unsaved changes?")}</h3>
+      <p id="discard-description">{t("Your saved tasks are unchanged.")}</p>
+      <div className="row">
+        <button ref={keepEditing} type="button" onClick={onKeepEditing}>
+          {t("Keep editing")}
+        </button>
+        <button type="button" onClick={onDiscard}>
+          {t("Discard")}
+        </button>
+      </div>
+    </dialog>
+  );
+}
 export function TaskEditor({
   initial,
   currentDay,
@@ -38,7 +83,6 @@ export function TaskEditor({
 }: Props) {
   useLanguage();
   const dialog = useRef<HTMLDialogElement>(null);
-  const keepEditing = useRef<HTMLButtonElement>(null);
   const [task, setTask] = useState(initial);
   const [scope, setScope] = useState<"occurrence" | "future" | "series">(
     "occurrence",
@@ -47,12 +91,6 @@ export function TaskEditor({
   const [discarding, setDiscarding] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  useEffect(() => {
-    if (discarding) {
-      keepEditing.current?.focus();
-      keepEditing.current?.scrollIntoView({ block: "nearest" });
-    }
-  }, [discarding]);
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
     const element = dialog.current!;
@@ -155,24 +193,6 @@ export function TaskEditor({
           </button>
         </header>
         <div className="editor-body">
-          {discarding && (
-            <section className="notice" aria-labelledby="discard-title">
-              <h3 id="discard-title">{t("Discard unsaved changes?")}</h3>
-              <p>{t("Your saved tasks are unchanged.")}</p>
-              <div className="row">
-                <button
-                  ref={keepEditing}
-                  type="button"
-                  onClick={() => setDiscarding(false)}
-                >
-                  {t("Keep editing")}
-                </button>
-                <button type="button" onClick={onClose}>
-                  {t("Discard")}
-                </button>
-              </div>
-            </section>
-          )}
           <label>
             {t("Task title")}
             <input
@@ -708,6 +728,12 @@ export function TaskEditor({
           </button>
         </footer>
       </form>
+      {discarding && (
+        <DiscardConfirmation
+          onKeepEditing={() => setDiscarding(false)}
+          onDiscard={onClose}
+        />
+      )}
     </dialog>
   );
 }

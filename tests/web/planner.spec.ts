@@ -792,7 +792,7 @@ test("quick add, optional drafts, task reminders and discard recovery preserve s
   await page.goto("/");
   await expect(page.getByRole("status")).toContainText("Synced");
   await page.getByRole("button", { name: "Add task", exact: true }).click();
-  const dialog = page.getByRole("dialog");
+  const dialog = page.locator("dialog.editor");
   await expect(dialog.getByLabel("Notes", { exact: true })).toHaveCount(0);
   await page.getByLabel("Task title").fill("  A simple plan  ");
   await page.screenshot({
@@ -832,17 +832,51 @@ test("quick add, optional drafts, task reminders and discard recovery preserve s
   ).not.toBeChecked();
   await expect(page.getByLabel("When overdue", { exact: true })).toBeChecked();
   await page.getByLabel("Task title").fill("An unsaved draft");
+  await dialog.locator(".editor-body").evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  const confirmation = page.getByRole("alertdialog", {
+    name: "Discard unsaved changes?",
+  });
+  await expect(confirmation).toBeVisible();
   await expect(
-    page.getByText("Discard unsaved changes?", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    dialog.getByRole("button", { name: "Keep editing" }),
+    confirmation.getByRole("button", { name: "Keep editing" }),
   ).toBeFocused();
-  await dialog.getByRole("button", { name: "Keep editing" }).click();
+  await expect.poll(() => confirmation.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const foreground = document.elementFromPoint(
+      rect.x + rect.width / 2,
+      rect.y + rect.height / 2,
+    );
+    return element.matches(":modal") && element.contains(foreground)
+      && rect.top >= 0 && rect.bottom <= innerHeight;
+  })).toBe(true);
+  await page.keyboard.press("Tab");
+  await expect(confirmation.getByRole("button", { name: "Discard", exact: true })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(confirmation.getByRole("button", { name: "Keep editing" })).toBeFocused();
+  expect(await confirmation.evaluate((element) => getComputedStyle(element).animationName)).toBe("discard-enter");
+  await confirmation.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
+  await page.screenshot({
+    path: `${process.env.QA_SCREENSHOT_DIR ?? "/tmp/timely-ux-evidence"}/ux-discard-${info.project.name}.png`,
+  });
+  await confirmation.getByRole("button", { name: "Keep editing" }).click();
+  await expect(confirmation).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "Cancel", exact: true })).toBeFocused();
   await expect(page.getByLabel("Task title")).toHaveValue("An unsaved draft");
   await page.keyboard.press("Escape");
-  await dialog.getByRole("button", { name: "Discard", exact: true }).click();
+  await expect(confirmation).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(confirmation).toHaveCount(0);
+  await expect(page.getByLabel("Task title")).toHaveValue("An unsaved draft");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.keyboard.press("Escape");
+  await expect(confirmation).toBeVisible();
+  expect(await confirmation.evaluate((element) => getComputedStyle(element).animationName)).toBe("none");
+  await confirmation.getByRole("button", { name: "Discard", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(card).toBeVisible();
   await expect(
