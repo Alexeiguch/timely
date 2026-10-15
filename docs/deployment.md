@@ -1,5 +1,7 @@
 # Planner deployment preparation
 
+Latest publication, 2026-10-15: reviewed source `955eee7` is READY as deployment `dpl_BowQFScE2ryRr7BwSzEEiyjjCXCf` on [Timely](https://timely-mauve-five.vercel.app). The foreground discard confirmation passes hosted desktop/phone checks, including saved-data preservation and reduced motion. [Branch review, verification and immutable deployment](release-review-2026-10-15.md). Existing Production settings were reused without migrations or native/store publication.
+
 The web planner was published to Vercel on 2026-10-08 at [timely-mauve-five.vercel.app](https://timely-mauve-five.vercel.app), with owner authorization. First-release acceptance remains unfinished; see [release-readiness.md](release-readiness.md). The separate root Neon hello deployment is unrelated. Additional production migrations, DNS changes and store submission require their own owner authorization.
 
 ## Web and authenticated backend
