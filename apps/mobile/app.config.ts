@@ -41,6 +41,11 @@ const config: ExpoConfig = {
     },
   },
   android: {
+    blockedPermissions: [
+      "android.permission.READ_EXTERNAL_STORAGE",
+      "android.permission.WRITE_EXTERNAL_STORAGE",
+      ...(variant === "development" ? [] : ["android.permission.SYSTEM_ALERT_WINDOW"]),
+    ],
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
       monochromeImage: "./assets/monochrome-icon.png",
@@ -59,7 +64,7 @@ const config: ExpoConfig = {
       },
     ],
     "expo-router",
-    "expo-secure-store",
+    ["expo-secure-store", { faceIDPermission: false }],
     "expo-apple-authentication",
     "expo-notifications",
     "./plugins/with-expo-sqlite-ios",

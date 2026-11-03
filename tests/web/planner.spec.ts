@@ -948,3 +948,18 @@ test("week quick add uses its own day and search explains the selected history r
     ),
   ).toBe(true);
 });
+
+test("account deletion offers reauthentication without discarding saved plans", async ({ page, context }) => {
+  await signIn(context, `reauth-proof-${randomUUID()}@example.test`);
+  await page.goto("/");
+  await expect(page.getByRole("status")).toContainText("Synced");
+  await create(page, "Keep this plan while signing in again");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByText("Manage account", { exact: true }).click();
+  await expect(page.getByText(/Offline copies on other devices may remain/)).toBeVisible();
+  await page.getByRole("button", { name: "Sign in again", exact: true }).click();
+  await expect(page.getByLabel("Email address")).toBeVisible();
+  await page.getByRole("button", { name: "Back to saved plans" }).click();
+  await page.getByRole("button", { name: "Planner", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Keep this plan while signing in again", exact: true })).toBeVisible();
+});

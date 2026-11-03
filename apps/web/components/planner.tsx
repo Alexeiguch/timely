@@ -850,6 +850,7 @@ export function Planner({
             }
             onDiscardSignOut={() => setDialog({ kind: "discard-signout" })}
             onDeleteAccount={() => setDialog({ kind: "account" })}
+            onSignIn={onSignIn}
             onSignOut={signOut}
           />
         )}

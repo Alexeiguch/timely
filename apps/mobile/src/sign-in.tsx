@@ -1,3 +1,4 @@
+import { PublicLinks } from "./public-links";
 import { LanguageChoice } from "./language";
 import { t, errorMessage, getLanguage } from "@timely/i18n";
 import { useLanguage } from "./language-state";
@@ -364,7 +365,8 @@ export function SignIn() {
           <View style={s.language}>
             <LanguageChoice />
           </View>
-        </ScrollView>
+          <PublicLinks />
+      </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

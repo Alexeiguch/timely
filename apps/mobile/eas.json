@@ -25,6 +25,13 @@
         "buildConfiguration": "Release"
       }
     },
+    "android-testing": {
+      "extends": "production",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "distribution": "store",
       "autoIncrement": true,

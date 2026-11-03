@@ -16,4 +16,4 @@ export function proxy(request: NextRequest) {
   response.headers.set("Cache-Control", "no-store");
   return response;
 }
-export const config = { matcher: ["/"] };
+export const config = { matcher: ["/", "/privacy", "/support", "/delete-account"] };

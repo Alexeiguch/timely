@@ -1591,3 +1591,18 @@ a {
 @media (max-width: 767px) {
   .history-filters > .form-grid { grid-template-columns: 1fr; }
 }
+
+.public-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 20px; padding: 16px 0; }
+.public-links a { display: inline-flex; align-items: center; min-height: 44px; color: var(--secondary); text-underline-offset: 4px; }
+.public-page { max-width: 880px; margin: auto; padding: 24px; }
+.public-page-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+.public-page-header .brand { color: var(--primary); font-size: 40px; text-decoration: none; }
+.public-page-card { padding: clamp(20px, 5vw, 48px); background: white; border: 1px solid #ced5df; border-radius: 24px; overflow-wrap: anywhere; }
+.public-page-card h1 { font-size: clamp(32px, 6vw, 48px); margin: 0 0 24px; }
+.public-page-card h2 { font-size: 26px; margin: 32px 0 12px; }
+.public-page-card li { line-height: 1.65; margin-bottom: 16px; }
+.public-page-card ol { padding-left: 24px; list-style: decimal; }
+.public-page-notice { background: var(--lime); padding: 16px; border-radius: 12px; }
+.public-page-action { display: inline-flex; align-items: center; min-height: 48px; background: var(--primary); color: white; border-radius: 18px; padding: 12px 20px; font-weight: 700; }
+.public-page a:focus-visible, .public-links a:focus-visible { outline: 3px solid var(--primary); outline-offset: 4px; }
+@media (max-width: 430px) { .public-page { padding: 20px; } }

@@ -1,3 +1,4 @@
+import { PublicLinks } from "./public-links";
 import { LanguageChoice } from "./language";
 import { t, locale } from "@timely/i18n";
 import { useLanguage } from "./language-state";
@@ -11,6 +12,7 @@ import { Button, Choices, Disclosure, Field, s } from "./ui";
 import { DateField } from "./date-field";
 import { requestReminderPermission } from "./notifications";
 import { dailySummaryDefaults } from "@timely/contracts";
+import { router } from "expo-router";
 export function Settings() {
   useLanguage();
   const account = useAccount();
@@ -89,9 +91,11 @@ export function Settings() {
           <Disclosure title={t("Manage account")}>
             <Text style={s.muted}>
               {t(
-                "Deleting your account permanently removes your plans and history from every device.",
+                "Deleting your account removes your plans and history from the service. Offline copies on other devices may remain until cleared on those devices.",
               )}
             </Text>
+            <Text style={s.muted}>{t("Before deleting, sign in again to the same account. Your saved changes stay on this device.")}</Text>
+            <Button title={t("Sign in again")} onPress={() => router.push("/sign-in")} />
             <Button
               title={t("Delete account")}
               variant="destructive"
@@ -99,7 +103,7 @@ export function Settings() {
                 Alert.alert(
                   t("Delete your account permanently?"),
                   t(
-                    "All tasks, history and preferences will be deleted on every device. Unsynced changes here will be discarded. Sign in within the last five minutes before continuing.",
+                    "All tasks, history and preferences will be deleted from the service. Unsynced changes here will be discarded. Sign in within the last five minutes before continuing.",
                   ),
                   [
                     { text: t("Cancel"), style: "cancel" },
@@ -364,6 +368,7 @@ export function Settings() {
             )}
           </Disclosure>
         </View>
+        <PublicLinks />
       </ScrollView>
     </SafeAreaView>
   );

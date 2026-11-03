@@ -1,5 +1,6 @@
 "use client";
 import { LanguageChoice } from "./language";
+import { PublicLinks } from "./public-links";
 import { t, errorMessage, getLanguage } from "@timely/i18n";
 import { useLanguage } from "./language-state";
 
@@ -333,6 +334,7 @@ export function SignIn() {
             </section>
           </>
         )}
+        <PublicLinks />
       </div>
     </main>
   );

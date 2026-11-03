@@ -2,7 +2,7 @@
 import { t } from "@timely/i18n";
 import { useLanguage } from "../components/language-state";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { authClient } from "@timely/auth/client";
 import { SignIn } from "../components/sign-in";
 import { Planner } from "../components/planner";
@@ -18,6 +18,7 @@ export default function Home() {
   const [cached, setCached] = useState<Identity | null>(null);
   const [ready, setReady] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+  const reauthSession = useRef<string | null>(null);
   useEffect(() => {
     const restore = () => {
       try {
@@ -64,7 +65,7 @@ export default function Home() {
     };
     localStorage.setItem(cacheKey, JSON.stringify(identity));
     setCached(identity);
-    setSigningIn(false);
+    if (session.session.id !== reauthSession.current) setSigningIn(false);
   }, [session]);
   const identity = session?.user ?? cached;
   if (!ready || (isPending && !identity))
@@ -92,7 +93,10 @@ export default function Home() {
       key={identity.id}
       identity={identity}
       needsSignIn={!session}
-      onSignIn={() => setSigningIn(true)}
+      onSignIn={() => {
+        reauthSession.current = session?.session.id ?? null;
+        setSigningIn(true);
+      }}
       onSignOut={() => {
         localStorage.removeItem(cacheKey);
         setCached(null);

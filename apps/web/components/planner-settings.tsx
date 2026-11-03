@@ -3,6 +3,7 @@ import { useState } from "react";
 import { t, locale } from "@timely/i18n";
 import { RotateCcw, Undo2, LogOut, Trash2 } from "lucide-react";
 import { LanguageChoice } from "./language";
+import { PublicLinks } from "./public-links";
 import { useLanguage } from "./language-state";
 import type { usePlanner } from "../lib/use-planner";
 type Props = {
@@ -14,6 +15,7 @@ type Props = {
   onDiscard: (definitionId: string) => void;
   onDiscardSignOut: () => void;
   onDeleteAccount: () => void;
+  onSignIn: () => void;
   onSignOut: () => Promise<void>;
 };
 export function PlannerSettings({
@@ -25,6 +27,7 @@ export function PlannerSettings({
   onDiscard,
   onDiscardSignOut,
   onDeleteAccount,
+  onSignIn,
   onSignOut,
 }: Props) {
   useLanguage();
@@ -243,9 +246,11 @@ export function PlannerSettings({
         <summary>{t("Manage account")}</summary>
         <p>
           {t(
-            "Deleting your account permanently removes your plans and history from every device.",
+            "Deleting your account removes your plans and history from the service. Offline copies on other devices may remain until cleared on those devices.",
           )}
         </p>
+        <p>{t("Before deleting, sign in again to the same account. Your saved changes stay on this device.")}</p>
+        <button type="button" onClick={onSignIn}>{t("Sign in again")}</button>
         <div className="account-danger">
           <button
             type="button"
@@ -259,6 +264,7 @@ export function PlannerSettings({
           </button>
         </div>
       </details>
+      <PublicLinks />
     </section>
   );
 }
