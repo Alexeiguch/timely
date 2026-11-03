@@ -78,3 +78,18 @@ Archive/export/logs: `/tmp/timely-login-logo-ios-20261013/`; durable IPA/manifes
 Apple accepted **0.1.0 (5)** from `7c0832e5d5085ee6756ccc8b8899493f1450f2c7`, with the larger login brand and three-cycle streak feedback. Xcode reported processing, `Upload succeeded` and `EXPORT SUCCEEDED`. Selected native/shared inputs, signature, identity, production entitlement/API, version and embedded bundle were verified. Processing completion/Internal tester access remain unverified; no public review submission occurred.
 
 Archive/export/logs: `/tmp/timely-streak-ios-20261013/`. Durable IPA/manifest/handoff: `.local/releases/2026-10-13/testflight-build-5/`. SHA-256: `ad50d00b38ad54d0549c3f6c3c9cbe7e026a3dc53e5e3124ae7e408378fa6324`. Vendor-framework dSYM warnings remain nonfatal. EAS production counter is **5**; next unused number **6**. Confirm the build's existing Internal group access in App Store Connect, then verify three pulses/resting state, foregrounding and reduced motion on a physical device. The browser session still requires sign-in; Expo has no App Store Connect API key.
+
+
+## Account recovery and public help build 6 — 2026-11-03
+
+Source `95b7f0c890f4b3bad8ed01a5533c21c5506f6bcf`; bundle `com.example.timely.dev`; version **0.1.0 (6)**. Archive/export and deep/strict IPA signature validation pass. Apple accepted the upload at 14:25:49 UTC (`Upload succeeded`, `EXPORT SUCCEEDED`), and App Store Connect visibly lists build 6 Processing. Durable IPA/manifest/handoff: `.local/releases/2026-11-03/testflight-build-6/`; exported IPA SHA-256 `4008e9b937a76e1d4a784bbe7a6a1a787f2ca7b3f6bf69b3b004c5a988a2a459`. EAS iOS counter is 6; next unused build number is 7. Final processing, the testing notes below and Internal assignment remain pending while the Mac is locked; no further binary upload is needed. No public App Store review occurred.
+
+App Store Connect now confirms builds 3–5 are processed and ready but have no Internal group assignment. Builds 1/2 have the existing Internal group. The new build should be assigned to that same group after upload/processing.
+
+### Testing notes: English (US)
+
+Try Settings → Manage account → Sign in again and confirm your saved plans remain. Open the privacy, support and account deletion links from sign-in and Settings. The privacy policy is still a draft while contact and retention details are confirmed. Check task creation/editing, recurring plans, offline save/reconnect, search and history. On a physical device, check optional reminders and daily-summary delivery/cancellation. Use a disposable test account if testing permanent account deletion.
+
+### Testing notes: Spanish (Mexico)
+
+Prueba Ajustes → Gestionar cuenta → Volver a iniciar sesión y comprueba que tus planes guardados se conservan. Abre los enlaces de privacidad, ayuda y eliminación de cuenta desde el inicio de sesión y Ajustes. La política de privacidad sigue siendo un borrador mientras se confirman el contacto y los plazos de conservación. Comprueba la creación y edición de tareas, las repeticiones, el guardado sin conexión y la sincronización al reconectar, la búsqueda y el historial. En un dispositivo físico, comprueba la entrega y cancelación de recordatorios y del resumen diario opcional. Usa una cuenta de prueba desechable para comprobar la eliminación permanente de cuenta.

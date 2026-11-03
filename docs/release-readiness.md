@@ -6,6 +6,8 @@ The web planner was published with owner authorization on 2026-10-08 at [timely-
 
 ## Executable local checks
 
+Update, 2026-11-03: account recovery and public privacy/support/deletion pages are now deployed on the existing Vercel origin, with links on web/native sign-in and Settings in the current source. Alexei Guchin is the confirmed operator. The owner asked to leave the public contact and retention facts pending; privacy remains a draft and R01 stays open. Apple sign-in is still disabled in hosted capabilities, and Apple revocation, reviewer access and final native/store acceptance remain open. [Release progress](progress.md#authorized-web-and-native-testing-release--2026-11-03) records the new CI, hosted checks and native testing rollout.
+
 ```sh
 pnpm install --frozen-lockfile
 docker compose up -d
