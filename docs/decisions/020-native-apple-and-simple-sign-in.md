@@ -1,6 +1,6 @@
 # 020 — Native Apple capability and simpler mobile sign-in
 
-Date: 2026-11-03. Status: implemented locally; production/native Apple acceptance pending.
+Date: 2026-11-03. Status: deployed; TestFlight build 7 available to Internal testers, physical Apple acceptance pending.
 
 The owner reported Apple sign-in unavailable in TestFlight, awkward sign-in language/design and an unwanted home completion toast. Read-only production checks confirmed `google=true, apple=false` and no `APPLE_BUNDLE_ID`, `APPLE_SERVICE_ID` or `APPLE_CLIENT_SECRET` in Vercel. Build 6 already has the native Apple entitlement. The installed Better Auth 1.7.6 provider verifies native ID tokens using Apple JWKS and the registered bundle audience; web OAuth credentials are not needed for that path. The previous server configuration incorrectly required them for every Apple flow.
 
@@ -10,4 +10,4 @@ Apply the Impeccable native iOS/Android guidance and React Native skill within T
 
 Completion remains an atomic local mutation/outbox write followed by sync and reminder reconciliation. Suppress its transient Undo notice; reopening from completed history reverses completion. Other state, move and delete Undo behavior stays available. No recurrence, ownership, sync, database schema or provider changes are involved.
 
-See the [verification and handoff](../mobile-sign-in-2026-11-03.md) for exact test results, Device Hub evidence, artifact paths and remaining external gates. Simulator appearance and synthetic signed-token tests do not prove physical Apple sign-in. Publication/store upload require the owner's authorization under the repository rules.
+See the [verification and handoff](../mobile-sign-in-2026-11-03.md) for exact test results, Device Hub evidence, artifact paths and remaining external gates. Simulator appearance and synthetic signed-token tests do not prove physical Apple sign-in. The owner explicitly authorized this backend deployment and TestFlight upload; public App Store submission remains separate.

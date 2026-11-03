@@ -97,7 +97,7 @@ Prueba Ajustes → Gestionar cuenta → Volver a iniciar sesión y comprueba que
 
 ## Simpler sign-in and native Apple — build 7 preparation (2026-11-03)
 
-Status: local release preparation; not uploaded or available to testers. See [verification/handoff](mobile-sign-in-2026-11-03.md). Production needs the reviewed native-only Apple configuration and `APPLE_BUNDLE_ID=com.example.timely.dev` before testing the new button. Preserve version 0.1.0, bundle `com.example.timely.dev`, existing Internal group and both testers. Local planned build number is 7; the EAS production counter is still 6 until an authorized release updates it.
+Status: Apple accepted the owner-authorized upload at **21:00:39 UTC** on 2026-11-03. Build **`aab8c9d3-5c63-481c-9b70-ae048a91a475`**, **0.1.0 (7)**, is processed and **En pruebas** in the existing Internal group for **two testers**, verified at 21:13 UTC. Its earlier builds 6, 2 and 1 remain available. See [verification/handoff](mobile-sign-in-2026-11-03.md). Source `3143482` is deployed with the native-only Apple configuration and registered `APPLE_BUNDLE_ID=com.example.timely.dev`; live capabilities verify `appleNative=true`. Preserve version 0.1.0, bundle `com.example.timely.dev`, existing Internal group and both testers. EAS's production iOS counter is verified as **7**; next unused build is **8**. Do not reupload this build. The two testing-note locales below were entered but saving redirected to Apple sign-in; **saving is unverified**, pending owner session renewal. No public review was submitted.
 
 English (US), What to Test:
 
