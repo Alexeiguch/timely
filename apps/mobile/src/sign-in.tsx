@@ -1,100 +1,95 @@
-import { PublicLinks } from "./public-links";
-import { LanguageChoice } from "./language";
-import { t, errorMessage, getLanguage } from "@timely/i18n";
-import { useLanguage } from "./language-state";
 import { useEffect, useRef, useState } from "react";
 import {
-  AccessibilityInfo,
-  Animated,
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { colors, surfaces } from "@timely/design";
+import * as AppleAuthentication from "expo-apple-authentication";
+import {
+  colors,
+  nativeTypography as type,
+  radius,
+  surfaces,
+} from "@timely/design";
+import { errorMessage, getLanguage, t } from "@timely/i18n";
+import { useLanguage } from "./language-state";
+import { LanguageChoice } from "./language";
+import { PublicLinks } from "./public-links";
 import { Brand } from "./brand";
 import { ProviderLogo } from "./provider-logo";
-import { PlannerDoodle } from "./doodle";
 import { Button } from "./ui";
-function Digit({ char }: { char: string }) {
-  useLanguage();
-  const motion = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    let cancel = false;
-    void AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
-      if (cancel) return;
-      if (reduce) {
-        motion.setValue(1);
-        return;
-      }
-      motion.setValue(0);
-      Animated.timing(motion, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: true,
-      }).start();
-    });
-    return () => {
-      cancel = true;
-    };
-  }, [char, motion]);
-  return (
-    <Animated.Text
-      style={{
-        opacity: motion,
-        transform: [
-          {
-            translateY: motion.interpolate({
-              inputRange: [0, 1],
-              outputRange: [8, 0],
-            }),
-          },
-          {
-            scale: motion.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.6, 1],
-            }),
-          },
-        ],
-        fontFamily: "Baloo2",
-        fontSize: 28,
-        color: colors.text,
-      }}
-    >
-      {char}
-    </Animated.Text>
-  );
-}
 import {
-  authClient,
   apiURL,
+  authClient,
   isGoogleSignInAvailable,
   signInApple,
   signInGoogle,
 } from "./auth";
+
+type Action = "apple" | "google" | "send" | "verify" | "resend";
+
 export function SignIn() {
   useLanguage();
   const googleSignInAvailable = isGoogleSignInAvailable();
   const [providers, setProviders] = useState({ google: false, apple: false });
-  const [providerState, setProviderState] = useState("loading");
+  const [providerState, setProviderState] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
   const [providerAttempt, setProviderAttempt] = useState(0);
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [sent, setSent] = useState(false);
+  const [pending, setPending] = useState<Action | null>(null);
+  const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const running = useRef(false);
+  const busy = pending !== null;
+
   useEffect(() => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
+    let active = true;
     setProviderState("loading");
-    void fetch(`${apiURL}/api/v1/auth/providers`, { signal: controller.signal })
-      .then(async (response) => {
+    setProviders({ google: false, apple: false });
+    void Promise.all([
+      fetch(`${apiURL}/api/v1/auth/providers`, {
+        signal: controller.signal,
+      }).then(async (response) => {
         if (!response.ok) throw new Error("Unavailable");
-        const value = await response.json();
+        const value: unknown = await response.json();
         if (
+          !value ||
+          typeof value !== "object" ||
+          !("google" in value) ||
           typeof value.google !== "boolean" ||
-          typeof value.apple !== "boolean"
-        )
+          !("apple" in value) ||
+          typeof value.apple !== "boolean" ||
+          ("appleNative" in value && typeof value.appleNative !== "boolean")
+        ) {
           throw new Error("Unavailable");
+        }
+        return {
+          google: value.google,
+          apple: value.apple,
+          appleNative:
+            "appleNative" in value && typeof value.appleNative === "boolean"
+              ? value.appleNative
+              : undefined,
+        };
+      }),
+      Platform.OS === "ios"
+        ? AppleAuthentication.isAvailableAsync().catch(() => false)
+        : Promise.resolve(true),
+    ])
+      .then(([value, appleAvailable]) => {
+        if (!active) return;
         setProviders({
           google:
             value.google &&
@@ -102,105 +97,90 @@ export function SignIn() {
             !!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID &&
             (Platform.OS !== "ios" ||
               !!process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID),
-          apple: value.apple,
+          apple:
+            appleAvailable &&
+            (Platform.OS === "ios" && value.appleNative !== undefined
+              ? value.appleNative
+              : value.apple),
         });
         setProviderState("ready");
       })
-      .catch(() => setProviderState("error"))
+      .catch(() => {
+        if (active) setProviderState("error");
+      })
       .finally(() => clearTimeout(timeout));
     return () => {
+      active = false;
       clearTimeout(timeout);
       controller.abort();
     };
   }, [googleSignInAvailable, providerAttempt]);
-  const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
-  const [shown, setShown] = useState("");
-  const [sent, setSent] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  const [cooldown, setCooldown] = useState(0);
+
   useEffect(() => {
     if (!cooldown) return;
     const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
     return () => clearTimeout(timer);
   }, [cooldown]);
-  useEffect(() => {
-    if (otp === shown) return;
-    let cancel = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    void AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
-      if (cancel) return;
-      const jump = otp.length - shown.length;
-      if (reduce || jump <= 1 || !otp.startsWith(shown)) {
-        setShown(otp);
-        return;
-      }
-      timer = setTimeout(() => setShown(otp.slice(0, shown.length + 1)), 90);
-    });
-    return () => {
-      cancel = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [otp, shown]);
-  async function run(action: () => Promise<void>) {
-    setBusy(true);
+
+  async function run(action: Action, work: () => Promise<void>) {
+    if (running.current) return;
+    running.current = true;
+    setPending(action);
     setMessage("");
+    setFailed(false);
     try {
-      await action();
-    } catch (e) {
-      const code = (
-        e as {
-          code?: string;
-        }
-      ).code;
-      setMessage(
-        code === "ERR_REQUEST_CANCELED"
-          ? t("Sign-in cancelled.")
-          : e instanceof Error
-            ? e.message
-            : t("Please try again."),
-      );
+      await work();
+    } catch (error) {
+      // Dismissing a provider sheet leaves the sign-in form ready to use.
+      if (
+        (error as { code?: string } | null)?.code !== "ERR_REQUEST_CANCELED"
+      ) {
+        setFailed(true);
+        setMessage(
+          error instanceof Error &&
+            /network|fetch|offline|connection/i.test(error.message)
+            ? t("Could not connect. Check your internet connection.")
+            : errorMessage(error, "Could not sign in. Please try again."),
+        );
+      }
     } finally {
-      setBusy(false);
+      running.current = false;
+      setPending(null);
     }
   }
+
   async function send(resend = false) {
+    const address = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+      throw new Error("Enter a valid email address.");
+    }
     const result = await authClient.emailOtp.sendVerificationOtp(
-      {
-        email,
-        type: "sign-in",
-      },
+      { email: address, type: "sign-in" },
       { headers: { "x-timely-language": getLanguage() } },
     );
     if (result.error) throw new Error(result.error.message);
+    setEmail(address);
     setSent(true);
     setCooldown(60);
     setOtp("");
-    setMessage(resend ? t("A new code is on its way.") : "");
+    setMessage(resend ? t("Code sent.") : "");
   }
-  const action = (
-    label: string,
-    fn: () => Promise<void>,
-    disabled = false,
-    variant: "primary" | "ghost" = "primary",
-  ) => (
-    <Button
-      title={label}
-      variant={variant}
-      disabled={busy || disabled}
-      loading={busy && variant === "primary"}
-      onPress={() => void run(fn)}
-    />
-  );
-  const availableProviders = (["google", "apple"] as const).filter(
-    (provider) => providers[provider],
-  );
+
+  async function verify() {
+    const result = await authClient.signIn.emailOtp({ email, otp });
+    if (result.error) throw new Error(result.error.message);
+  }
+
   const feedback = message ? (
-    <Text accessibilityLiveRegion="polite" style={s.caption}>
+    <Text
+      accessibilityRole={failed ? "alert" : undefined}
+      accessibilityLiveRegion="polite"
+      style={[s.caption, failed && s.error]}
+    >
       {errorMessage(message)}
     </Text>
   ) : null;
+
   return (
     <SafeAreaView style={s.screen}>
       <KeyboardAvoidingView
@@ -212,45 +192,16 @@ export function SignIn() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
         >
-          <View style={[s.hero, sent && s.codeHero]}>
-            <View style={s.heroTop}>
-              <Brand large />
-              {!sent && <PlannerDoodle width={84} height={70} />}
-            </View>
-            <Text accessibilityRole="header" style={s.title}>
-              {sent ? t("Enter your code") : t("Make yourself at home.")}
-            </Text>
-            {!sent && (
-              <Text style={s.heroCaption}>
-                {t("A little space for what matters.")}
-              </Text>
-            )}
+          <View style={s.brand}>
+            <Brand large />
           </View>
-          {sent ? (
-            <View style={s.card}>
-              <Text style={s.body}>{t("Sent to {v0}", { v0: email })}</Text>
-              <Text style={s.label}>{t("Six-digit code")}</Text>
-              <View style={s.otpField}>
-                <View style={s.otpRow} accessible={false}>
-                  {Array.from({ length: 6 }, (_, index) => {
-                    const char = shown[index] ?? "";
-                    const active = index === Math.min(otp.length, 5);
-                    return (
-                      <View
-                        key={index}
-                        style={[
-                          s.otpCell,
-                          char ? s.otpFilled : null,
-                          active ? s.otpActive : null,
-                        ]}
-                      >
-                        {char ? (
-                          <Digit key={index + "-" + char} char={char} />
-                        ) : null}
-                      </View>
-                    );
-                  })}
-                </View>
+          <View style={s.form}>
+            <Text accessibilityRole="header" maxFontSizeMultiplier={1.5} style={s.title}>
+              {sent ? t("Enter your code") : t("Sign in")}
+            </Text>
+            {sent ? (
+              <>
+                <Text style={s.body}>{t("Sent to {v0}", { v0: email })}</Text>
                 <TextInput
                   accessibilityLabel={t("Six-digit code")}
                   value={otp}
@@ -263,214 +214,209 @@ export function SignIn() {
                   textContentType="oneTimeCode"
                   importantForAutofill="yes"
                   autoFocus
-                  style={s.otpCapture}
+                  editable={!busy}
+                  style={[s.input, s.code]}
                 />
-              </View>
-              <Text style={s.caption}>{t("Expires in 5 minutes.")}</Text>
-              {action(
-                t("Sign in"),
-                async () => {
-                  const result = await authClient.signIn.emailOtp({
-                    email,
-                    otp,
-                  });
-                  if (result.error) throw new Error(result.error.message);
-                },
-                otp.length !== 6,
-              )}
-              {feedback}
-              <View style={s.secondaryActions}>
-                {action(
-                  cooldown
-                    ? t("Resend in {v0}s", { v0: cooldown })
-                    : t("Resend code"),
-                  () => send(true),
-                  cooldown > 0,
-                  "ghost",
-                )}
-                {action(
-                  t("Change email"),
-                  async () => {
-                    setSent(false);
-                    setOtp("");
-                    setMessage("");
-                  },
-                  false,
-                  "ghost",
-                )}
-              </View>
-            </View>
-          ) : (
-            <View style={s.card}>
-              {availableProviders.length > 0 && (
-                <>
-                  <View style={s.providers}>
-                    {availableProviders.map((provider) => (
-                      <Button
-                        key={provider}
-                        title={t("Continue with {v0}", {
-                          v0: provider === "google" ? "Google" : "Apple",
-                        })}
-                        disabled={busy}
-                        onPress={() =>
-                          void run(
-                            provider === "google" ? signInGoogle : signInApple,
-                          )
-                        }
-                      >
-                        <ProviderLogo provider={provider} />
-                      </Button>
-                    ))}
-                  </View>
-                  <View style={s.dividerRow}>
-                    <View style={s.line} />
-                    <Text style={s.caption}>{t("or")}</Text>
-                    <View style={s.line} />
-                  </View>
-                </>
-              )}
-              <Text style={s.label}>{t("Email address")}</Text>
-              <TextInput
-                accessibilityLabel={t("Email address")}
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                autoComplete="email"
-                textContentType="emailAddress"
-                placeholder={t("Your email address")}
-                placeholderTextColor={colors.muted}
-                style={s.input}
-              />
-              {action(t("Send me a code"), () => send())}
-              <Text style={s.caption}>
-                {t("No password to remember. Just you and your plans.")}
-              </Text>
-              {feedback}
-              {providerState === "error" && (
-                <>
-                  <Text style={s.caption}>
-                    {t("Other sign-in options are unavailable.")}
-                  </Text>
+                <Text style={s.caption}>{t("Expires in 5 minutes.")}</Text>
+                {feedback}
+                <Button
+                  title={t("Sign in")}
+                  variant="primary"
+                  disabled={busy || otp.length !== 6}
+                  loading={pending === "verify"}
+                  onPress={() => void run("verify", verify)}
+                />
+                <View style={s.secondaryActions}>
                   <Button
-                    title={t("Retry other options")}
+                    title={
+                      cooldown
+                        ? t("Resend in {v0}s", { v0: cooldown })
+                        : t("Resend code")
+                    }
+                    variant="ghost"
+                    disabled={busy || cooldown > 0}
+                    loading={pending === "resend"}
+                    onPress={() => void run("resend", () => send(true))}
+                  />
+                  <Button
+                    title={t("Change email")}
+                    variant="ghost"
+                    disabled={busy}
+                    onPress={() => {
+                      setSent(false);
+                      setOtp("");
+                      setMessage("");
+                    }}
+                  />
+                </View>
+              </>
+            ) : (
+              <>
+                {(providers.apple || providers.google) && (
+                  <>
+                    <View style={s.providers}>
+                      {providers.apple &&
+                        (Platform.OS === "ios" ? (
+                          <View
+                            pointerEvents={busy ? "none" : "auto"}
+                            accessibilityState={{
+                              disabled: busy,
+                              busy: pending === "apple",
+                            }}
+                          >
+                            <AppleAuthentication.AppleAuthenticationButton
+                              buttonType={
+                                AppleAuthentication
+                                  .AppleAuthenticationButtonType.CONTINUE
+                              }
+                              buttonStyle={
+                                AppleAuthentication
+                                  .AppleAuthenticationButtonStyle.BLACK
+                              }
+                              cornerRadius={radius.medium}
+                              style={s.appleButton}
+                              onPress={() => void run("apple", signInApple)}
+                            />
+                            {pending === "apple" && (
+                              <View pointerEvents="none" style={s.appleLoading}>
+                                <ActivityIndicator color={colors.surface} />
+                              </View>
+                            )}
+                          </View>
+                        ) : (
+                          <Button
+                            title={t("Continue with Apple")}
+                            disabled={busy}
+                            loading={pending === "apple"}
+                            onPress={() => void run("apple", signInApple)}
+                          >
+                            <ProviderLogo provider="apple" />
+                          </Button>
+                        ))}
+                      {providers.google && (
+                        <Button
+                          title={t("Continue with Google")}
+                          disabled={busy}
+                          loading={pending === "google"}
+                          onPress={() => void run("google", signInGoogle)}
+                        >
+                          <ProviderLogo provider="google" />
+                        </Button>
+                      )}
+                    </View>
+                    <View style={s.dividerRow}>
+                      <View style={s.line} />
+                      <Text style={s.caption}>{t("or")}</Text>
+                      <View style={s.line} />
+                    </View>
+                  </>
+                )}
+                <View style={s.field}>
+                  <Text style={s.label}>{t("Email address")}</Text>
+                  <TextInput
+                    accessibilityLabel={t("Email address")}
+                    value={email}
+                    onChangeText={setEmail}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="email-address"
+                    autoComplete="email"
+                    textContentType="emailAddress"
+                    editable={!busy}
+                    returnKeyType="go"
+                    onSubmitEditing={() => void run("send", () => send())}
+                    style={s.input}
+                  />
+                </View>
+                {feedback}
+                <Button
+                  title={t("Send code")}
+                  variant="primary"
+                  disabled={busy || !email.trim()}
+                  loading={pending === "send"}
+                  onPress={() => void run("send", () => send())}
+                />
+                {providerState === "error" && (
+                  <Button
+                    title={t("Retry sign-in options")}
                     variant="ghost"
                     disabled={busy}
                     onPress={() => setProviderAttempt((value) => value + 1)}
                   />
-                </>
-              )}
-            </View>
-          )}
-          <View style={s.language}>
-            <LanguageChoice />
+                )}
+              </>
+            )}
           </View>
-          <PublicLinks />
-      </ScrollView>
+          <View style={s.footer}>
+            <LanguageChoice compact />
+            <PublicLinks />
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
+
 const s = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  content: {
+    flexGrow: 1,
+    padding: 24,
+    paddingBottom: 16,
+    width: "100%",
+    maxWidth: 440,
+    alignSelf: "center",
+  },
+  brand: { alignItems: "center", paddingTop: 24, paddingBottom: 32 },
+  form: { gap: 16 },
+  title: { ...type.heading, color: colors.text, marginBottom: 8 },
+  body: { ...type.body, color: colors.text },
+  label: { ...type.label, color: colors.text },
+  caption: { ...type.caption, color: colors.muted },
+  error: { color: surfaces.danger },
+  field: { gap: 8 },
+  input: {
+    ...type.body,
+    minHeight: 56,
+    borderWidth: 1,
+    borderColor: surfaces.inputBorder,
+    borderRadius: radius.small,
+    padding: 16,
+    color: colors.text,
+    backgroundColor: colors.surface,
+  },
+  code: {
+    fontFamily: "NunitoSansBold",
+    fontSize: 28,
+    lineHeight: 36,
+    letterSpacing: 8,
+    textAlign: "center",
+  },
   providers: { gap: 12 },
+  appleButton: { width: "100%", height: 52 },
+  appleLoading: {
+    position: "absolute",
+    right: 16,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    paddingVertical: 8,
+  },
+  line: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: surfaces.inputBorder,
+  },
   secondaryActions: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
     gap: 8,
   },
-  caption: {
-    fontFamily: "NunitoSans",
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.muted,
-  },
-  dividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 8,
-  },
-  line: { flex: 1, height: 1, backgroundColor: surfaces.border },
-  screen: { flex: 1, backgroundColor: colors.background },
-  content: {
-    padding: 20,
-    gap: 16,
-    paddingBottom: 32,
-    width: "100%",
-    maxWidth: 520,
-    alignSelf: "center",
-  },
-  hero: {
-    padding: 24,
-    paddingBottom: 32,
-    gap: 8,
-    borderRadius: 32,
-    backgroundColor: surfaces.blue,
-  },
-  heroTop: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  heroCaption: {
-    fontFamily: "NunitoSans",
-    fontSize: 16,
-    lineHeight: 23,
-    color: colors.text,
-  },
-  codeHero: { paddingBottom: 24 },
-  language: { paddingHorizontal: 8, marginTop: 8 },
-  title: {
-    fontFamily: "Baloo2",
-    color: colors.text,
-    fontSize: 32,
-    lineHeight: 40,
-  },
-  body: { fontFamily: "NunitoSans", fontSize: 16, color: colors.muted },
-  label: { fontFamily: "NunitoSans", color: colors.text, fontSize: 16 },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    padding: 20,
-    gap: 12,
-    marginTop: -28,
-    borderWidth: 1,
-    borderColor: surfaces.border,
-  },
-  input: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: surfaces.inputBorder,
-    borderRadius: 12,
-    padding: 12,
-    fontFamily: "NunitoSans",
-    fontSize: 16,
-    color: colors.text,
-  },
-  otpField: { position: "relative" },
-  otpRow: { flexDirection: "row", gap: 8 },
-  otpCell: {
-    flex: 1,
-    minHeight: 56,
-    borderWidth: 1,
-    borderColor: colors.muted,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface,
-  },
-  otpFilled: { borderColor: colors.primary, backgroundColor: "#f3f7ff" },
-  otpActive: { borderColor: colors.primary },
-  otpCapture: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    color: "transparent",
-    fontSize: 16,
-  },
+  footer: { marginTop: "auto", paddingTop: 32, gap: 8 },
 });

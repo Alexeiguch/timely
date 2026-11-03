@@ -7,7 +7,11 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const providers = auth().options.socialProviders;
   return Response.json(
-    { google: Boolean(providers.google), apple: Boolean(providers.apple) },
+    {
+      google: Boolean(providers.google),
+      apple: Boolean(providers.apple?.clientSecret),
+      appleNative: Boolean(providers.apple?.appBundleIdentifier),
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

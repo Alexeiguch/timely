@@ -90,7 +90,16 @@ export async function signInApple() {
     throw new Error("Apple did not return an identity token");
   const result = await authClient.signIn.social({
     provider: "apple",
-    idToken: { token: credential.identityToken, nonce },
+    idToken: {
+      token: credential.identityToken,
+      nonce,
+      user: {
+        name: {
+          firstName: credential.fullName?.givenName ?? undefined,
+          lastName: credential.fullName?.familyName ?? undefined,
+        },
+      },
+    },
   });
   if (result.error) throw new Error(result.error.message);
 }

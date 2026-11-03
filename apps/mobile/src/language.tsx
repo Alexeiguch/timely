@@ -16,23 +16,25 @@ const storage: LanguageStorage = {
 export function LanguageRoot({ children }: { children: ReactNode }) {
   return <LanguageProvider storage={storage}>{children}</LanguageProvider>;
 }
-export function LanguageChoice() {
+export function LanguageChoice({ compact = false }: { compact?: boolean }) {
   const language = useLanguage();
   const { error } = useLanguagePersistence();
   return (
     <View style={s.field}>
-      <Text style={s.label}>{t("Language")}</Text>
-      <View style={s.row}>
+      {!compact && <Text style={s.label}>{t("Language")}</Text>}
+      <View style={[s.row, compact && { justifyContent: "center" }]}>
         <Button
           title="Español"
           label="Español"
           active={language === "es"}
+          variant={compact ? "ghost" : "secondary"}
           onPress={() => setLanguage("es")}
         />
         <Button
           title="English"
           label="English"
           active={language === "en"}
+          variant={compact ? "ghost" : "secondary"}
           onPress={() => setLanguage("en")}
         />
       </View>

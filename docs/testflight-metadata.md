@@ -93,3 +93,16 @@ Try Settings → Manage account → Sign in again and confirm your saved plans r
 ### Testing notes: Spanish (Mexico)
 
 Prueba Ajustes → Gestionar cuenta → Volver a iniciar sesión y comprueba que tus planes guardados se conservan. Abre los enlaces de privacidad, ayuda y eliminación de cuenta desde el inicio de sesión y Ajustes. La política de privacidad sigue siendo un borrador mientras se confirman el contacto y los plazos de conservación. Comprueba la creación y edición de tareas, las repeticiones, el guardado sin conexión y la sincronización al reconectar, la búsqueda y el historial. En un dispositivo físico, comprueba la entrega y cancelación de recordatorios y del resumen diario opcional. Usa una cuenta de prueba desechable para comprobar la eliminación permanente de cuenta.
+
+
+## Simpler sign-in and native Apple — build 7 preparation (2026-11-03)
+
+Status: local release preparation; not uploaded or available to testers. See [verification/handoff](mobile-sign-in-2026-11-03.md). Production needs the reviewed native-only Apple configuration and `APPLE_BUNDLE_ID=com.example.timely.dev` before testing the new button. Preserve version 0.1.0, bundle `com.example.timely.dev`, existing Internal group and both testers. Local planned build number is 7; the EAS production counter is still 6 until an authorized release updates it.
+
+English (US), What to Test:
+
+A simpler sign-in screen with clear email-code entry and Apple sign-in. Try signing in with Apple for the first time and again, Hide My Email, cancellation and email-code fallback. Complete a task: progress should update without a banner. Open completed tasks to reopen it, then restart the app and check that your session and plans remain. Check Spanish and English, larger text and iPad layout.
+
+Spanish (Mexico), Qué probar:
+
+Inicio de sesión más sencillo, con un campo claro para el código del correo y acceso con Apple. Prueba el primer acceso con Apple, volver a entrar, Ocultar mi correo, cancelar y acceder con un código de correo. Completa una tarea: el progreso debe actualizarse sin avisos. Abre las tareas completadas para volver a activar una, reinicia la app y comprueba que se conservan la sesión y tus planes. Revisa español e inglés, texto grande y la pantalla del iPad.

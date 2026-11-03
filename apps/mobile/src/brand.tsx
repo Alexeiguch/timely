@@ -7,7 +7,7 @@ export function Brand({ large = false }: { large?: boolean }) {
       accessible
       accessibilityLabel="Timely"
     >
-      <Text style={[styles.word, large && styles.largeWord]}>timely</Text>
+      <Text allowFontScaling={false} style={[styles.word, large && styles.largeWord]}>timely</Text>
       <View style={[styles.mark, large && styles.largeMark]}>
         <Image
           source={require("../assets/icon.png")}

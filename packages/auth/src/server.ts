@@ -6,6 +6,7 @@ import { expo } from "@better-auth/expo";
 import { database } from "@timely/db";
 import * as schema from "@timely/db/schema";
 import { sendCode } from "./mail";
+import { appleConfiguration } from "./apple";
 import { z } from "zod";
 const environment = z.object({
   BETTER_AUTH_SECRET: z.string().min(32),
@@ -15,7 +16,7 @@ const environment = z.object({
 export function createAuth() {
   const env = environment.parse(process.env);
   const googleId = process.env.GOOGLE_WEB_CLIENT_ID;
-  const appleId = process.env.APPLE_SERVICE_ID;
+  const apple = appleConfiguration(process.env);
   return betterAuth({
     appName: "Timely",
     baseURL: env.BETTER_AUTH_URL,
@@ -45,17 +46,7 @@ export function createAuth() {
             },
           }
         : {}),
-      ...(appleId && process.env.APPLE_CLIENT_SECRET
-        ? {
-            apple: {
-              clientId: appleId,
-              clientSecret: process.env.APPLE_CLIENT_SECRET,
-              audience: [appleId, process.env.APPLE_BUNDLE_ID].filter(
-                (s): s is string => !!s,
-              ),
-            },
-          }
-        : {}),
+      ...(apple ? { apple } : {}),
     },
     plugins: [
       expo(),

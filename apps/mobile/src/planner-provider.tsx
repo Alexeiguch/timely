@@ -457,17 +457,15 @@ export function PlannerProvider({
           state: next,
           terminal: updated.terminal,
         },
-        {
-          type: "state",
-          target: occurrenceTarget(item),
-          state: item.state,
-          terminal: item.terminal,
-        },
-        next === "pending"
-          ? "Task reopened"
-          : next === "completed"
-            ? "Task completed"
-            : "Occurrence skipped",
+        next === "completed"
+          ? undefined
+          : {
+              type: "state",
+              target: occurrenceTarget(item),
+              state: item.state,
+              terminal: item.terminal,
+            },
+        next === "pending" ? "Task reopened" : "Occurrence skipped",
       );
     },
     move: async (item, day) => {

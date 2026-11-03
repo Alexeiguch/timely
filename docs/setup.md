@@ -55,11 +55,26 @@ CLI installation uses `/Users/alexei/.local/bin/neon` because `/usr/local/lib/no
 
 ## Apple
 
-1. Use an active Apple Developer team. Register the actual App ID with Sign in with Apple. `com.example.timely.*` values are documented placeholders, not registered IDs.
+Native iOS and browser Apple sign-in have separate capabilities. **For the existing TestFlight app**, the registered bundle ID is `com.example.timely.dev` (team `2H4382Y5NM`). Set server-only `APPLE_BUNDLE_ID=com.example.timely.dev`; this enables native ID-token verification without a Service ID, client secret or private key. Better Auth 1.7.6 validates Apple's signature, issuer, expiry, app audience and raw/SHA-256 nonce. Native first-authorization names are passed separately; repeat authorizations may omit them. Do not enable arbitrary audiences or skip token verification.
+
+Production was checked on 2026-11-03: `/api/v1/auth/providers` returned `apple=false`, and Vercel had none of the three Apple variables. After owner-authorized backend publication with the bundle variable, the response must include `appleNative=true`. `apple` continues to describe **browser** OAuth, so the web/Android buttons stay hidden until their credentials are complete. Older server responses remain supported by the updated mobile client. Full native acceptance requires a signed physical device, including first/repeat sign-in, cancellation and private relay.
+
+To configure the approved production project when publishing is authorized:
+
+```sh
+printf '%s' 'com.example.timely.dev' | vercel env add APPLE_BUNDLE_ID production
+# Deploy the reviewed backend, then check these public flags:
+curl --fail https://timely-mauve-five.vercel.app/api/v1/auth/providers
+# Expected: appleNative=true; apple=false until browser OAuth is configured.
+```
+
+For web/Android browser sign-in:
+
+1. Use the existing active Apple Developer team and native App ID with Sign in with Apple enabled. New apps must use their own registered IDs.
 2. Create a distinct Service ID for web/Android, associate the native App ID, and register a real HTTPS callback domain and `https://BACKEND_HOST/api/auth/callback/apple`. Apple browser sign-in cannot use localhost.
 3. Generate the Sign in with Apple key. Keep its `.p8` private key, team ID and key ID server-side or in a secure signing workflow.
 4. Generate an ES256 client-secret JWT with issuer=team ID, subject=Service ID, audience=`https://appleid.apple.com`, key ID in header, and expiration less than Apple's maximum six-month interval. Store only the resulting JWT in `APPLE_CLIENT_SECRET`; renew before expiry. Use the official [Better Auth Apple guide](https://better-auth.com/docs/authentication/apple).
-5. Set `APPLE_SERVICE_ID` and `APPLE_BUNDLE_ID`. The server validates both allowed audiences through Better Auth; native iOS sends a random nonce and the verified identity token. No token verification bypass or platform-header audience selection is used.
+5. Set `APPLE_SERVICE_ID` and `APPLE_CLIENT_SECRET`, retaining `APPLE_BUNDLE_ID` for iOS. The server accepts the configured service and native audiences through Better Auth; native iOS sends a random nonce and the verified identity token. No token verification bypass or platform-header audience selection is used.
 6. Verify first and repeat authorization, cancellation, private relay, and missing subsequent profile details on a real iOS build. Android uses Apple browser OAuth with app return.
 
 ## Email delivery

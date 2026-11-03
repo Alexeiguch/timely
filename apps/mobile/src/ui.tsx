@@ -69,7 +69,7 @@ export function Button({
         s.button,
         variant === "ghost" && s.ghost,
         filled && s.active,
-        disabled && s.disabled,
+        disabled && !loading && s.disabled,
         pressed && s.pressed,
         style,
       ]}
@@ -85,6 +85,7 @@ export function Button({
           variant === "ghost" && s.link,
           variant === "destructive" && s.danger,
           filled && s.activeText,
+          disabled && !loading && s.disabledText,
         ]}
       >
         {title}
@@ -361,7 +362,11 @@ export const s = StyleSheet.create({
   danger: { color: surfaces.danger },
   active: { backgroundColor: colors.primary, borderColor: colors.primary },
   activeText: { color: colors.surface },
-  disabled: { backgroundColor: surfaces.neutral },
+  disabled: {
+    backgroundColor: surfaces.neutral,
+    borderColor: surfaces.border,
+  },
+  disabledText: { color: colors.text },
   pressed: { opacity: 0.72 },
   notice: {
     backgroundColor: colors.lime,

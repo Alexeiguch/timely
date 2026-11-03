@@ -24,9 +24,14 @@ test("serves browser icons and advertises only configured social providers", asy
   expect(response.ok()).toBe(true);
   expect(response.headers()["cache-control"]).toBe("no-store");
   const providers = await response.json();
-  expect(Object.keys(providers).sort()).toEqual(["apple", "google"]);
+  expect(Object.keys(providers).sort()).toEqual([
+    "apple",
+    "appleNative",
+    "google",
+  ]);
   expect(typeof providers.google).toBe("boolean");
   expect(typeof providers.apple).toBe("boolean");
+  expect(typeof providers.appleNative).toBe("boolean");
 
   const socialRequests: string[] = [];
   page.on("request", (req) => {
